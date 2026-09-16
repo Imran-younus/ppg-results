@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PPG Delay Chain — Simulation Results</title>
+<style>
+  :root {
+    --bg:#ffffff; --surface:#f7f8fa; --surface2:#eef0f4; --border:#e5e7eb;
+    --text:#1f2328; --muted:#57606a; --accent:#3b82d4; --accent2:#7c5cd8;
+    --tsl6:#3b82d4; --tsl7:#7c5cd8; --tsl8:#e07b39;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,"Segoe UI",system-ui,sans-serif;font-size:14px;line-height:1.6;background:var(--bg);color:var(--text);}
+  .page{max-width:1100px;margin:0 auto;padding:28px 20px 48px;}
+  header{border-bottom:1px solid var(--border);padding-bottom:16px;margin-bottom:24px;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+  header h1{font-size:20px;font-weight:700;}
+  header p{color:var(--muted);font-size:13px;margin-top:2px;}
+  .badge{display:inline-block;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:12px;color:var(--muted);}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:28px;}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;}
+  .kpi-label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:4px;}
+  .kpi-value{font-size:22px;font-weight:700;}
+  .kpi-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+  section{margin-bottom:36px;}
+  .section-title{font-size:15px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+  .section-title span{width:4px;height:18px;border-radius:2px;display:inline-block;background:var(--accent);}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
+  .controls label{font-size:12px;color:var(--muted);margin-right:2px;}
+  .btn{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;transition:background .15s,border-color .15s;}
+  .btn:hover{background:var(--surface2);}
+  .btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .btn.active.purple{background:var(--accent2);border-color:var(--accent2);}
+  .btn.active.orange{background:var(--tsl8);border-color:var(--tsl8);}
+  .sep{width:1px;height:22px;background:var(--border);}
+  .table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  thead th{background:var(--surface);font-weight:600;padding:9px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;}
+  thead th:hover{background:var(--surface2);}
+  .sort-icon{color:var(--muted);font-size:10px;margin-left:4px;}
+  tbody tr{border-bottom:1px solid var(--border);transition:background .1s;}
+  tbody tr:last-child{border-bottom:none;}
+  tbody tr:hover{background:#f0f4ff;}
+  td{padding:8px 12px;white-space:nowrap;}
+  td.cell-name{font-weight:500;}
+  .tsl-chip{display:inline-block;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:600;}
+  .tsl6{background:#dbeafe;color:#1d4ed8;}
+  .tsl7{background:#ede9fe;color:#5b21b6;}
+  .tsl8{background:#ffedd5;color:#92400e;}
+  .bar-cell{display:flex;align-items:center;gap:8px;}
+  .bar-bg{flex:1;background:var(--surface2);border-radius:3px;height:6px;min-width:60px;}
+  .bar-fill{height:6px;border-radius:3px;}
+  .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  @media(max-width:680px){.charts-grid{grid-template-columns:1fr;}}
+  .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;}
+  .chart-title{font-size:13px;font-weight:600;margin-bottom:12px;}
+  canvas{display:block;}
+  footer{border-top:1px solid var(--border);margin-top:48px;padding-top:12px;text-align:center;font-size:12px;color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <div>
+      <h1>PPG Delay Chain — Simulation Results</h1>
+      <p>HSPICE &nbsp;·&nbsp; v0.6SB ULVT model &nbsp;·&nbsp; VDD = 0.5 V &nbsp;·&nbsp; T = 25 °C</p>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <span class="badge">24 cells</span>
+      <span class="badge">6TSL / 7TSL / 8TSL</span>
+      <span class="badge">TT corner</span>
+    </div>
+  </header>
+
+  <div class="kpis">
+    <div class="kpi"><div class="kpi-label">Fastest Stage Delay</div><div class="kpi-value" style="color:var(--tsl8)">7.66 ps</div><div class="kpi-sub">8TSL INV</div></div>
+    <div class="kpi"><div class="kpi-label">Slowest Stage Delay</div><div class="kpi-value" style="color:var(--muted)">26.40 ps</div><div class="kpi-sub">6TSL AOI22</div></div>
+    <div class="kpi"><div class="kpi-label">Best AC Ceff (rail)</div><div class="kpi-value" style="color:var(--tsl6)">3.70 aF</div><div class="kpi-sub">6TSL NAND2B</div></div>
+    <div class="kpi"><div class="kpi-label">Best AC Reff (rail)</div><div class="kpi-value" style="color:var(--tsl8)">1178 Ω</div><div class="kpi-sub">8TSL INV</div></div>
+  </div>
+
+  <section>
+    <div class="section-title"><span></span>Filter &amp; View</div>
+    <div class="controls">
+      <label>Track height:</label>
+      <button class="btn active" id="f6" onclick="setFilter('tsl','6')">6TSL</button>
+      <button class="btn active purple" id="f7" onclick="setFilter('tsl','7')">7TSL</button>
+      <button class="btn active orange" id="f8" onclick="setFilter('tsl','8')">8TSL</button>
+      <div class="sep"></div>
+      <label>Cell type:</label>
+      <button class="btn active" id="fINV" onclick="setFilter('cell','INV')">INV</button>
+      <button class="btn active" id="fNAND2B" onclick="setFilter('cell','NAND2B')">NAND2</button>
+      <button class="btn active" id="fNOR2B" onclick="setFilter('cell','NOR2B')">NOR2</button>
+      <button class="btn active" id="fNAND3B" onclick="setFilter('cell','NAND3B')">NAND3</button>
+      <button class="btn active" id="fAOI21" onclick="setFilter('cell','AOI21')">AOI21</button>
+      <button class="btn active" id="fAOI22" onclick="setFilter('cell','AOI22')">AOI22</button>
+      <button class="btn active" id="fOAI21" onclick="setFilter('cell','OAI21')">OAI21</button>
+      <button class="btn active" id="fOAI22" onclick="setFilter('cell','OAI22')">OAI22</button>
+      <div class="sep"></div>
+      <button class="btn" onclick="resetFilters()">Reset All</button>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-title"><span></span>Results Table <span style="font-size:12px;font-weight:400;color:var(--muted);margin-left:4px;">(click column header to sort)</span></div>
+    <div class="table-wrap">
+      <table id="main-table">
+        <thead>
+          <tr>
+            <th onclick="sortTable(0)">Cell <span class="sort-icon" id="si0">↕</span></th>
+            <th onclick="sortTable(1)">Track <span class="sort-icon" id="si1">↕</span></th>
+            <th onclick="sortTable(2)">Stage Delay (ps) <span class="sort-icon" id="si2">↑</span></th>
+            <th onclick="sortTable(3)">AC Ceff rail (aF) <span class="sort-icon" id="si3">↕</span></th>
+            <th onclick="sortTable(4)">AC Reff rail (Ω) <span class="sort-icon" id="si4">↕</span></th>
+            <th onclick="sortTable(5)">Iddq (µA) <span class="sort-icon" id="si5">↕</span></th>
+            <th onclick="sortTable(6)">Idda rail (µA) <span class="sort-icon" id="si6">↕</span></th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-title"><span></span>Charts</div>
+    <div class="charts-grid">
+      <div class="chart-card"><div class="chart-title">Stage Delay by Cell &amp; Track Height (ps)</div><canvas id="chart-delay" height="260"></canvas></div>
+      <div class="chart-card"><div class="chart-title">AC Ceff Rail by Cell &amp; Track Height (aF)</div><canvas id="chart-ceff" height="260"></canvas></div>
+      <div class="chart-card"><div class="chart-title">AC Reff Rail by Cell &amp; Track Height (Ω)</div><canvas id="chart-reff" height="260"></canvas></div>
+      <div class="chart-card"><div class="chart-title">Iddq vs Idda Rail per Cell (µA)</div><canvas id="chart-iddq" height="260"></canvas></div>
+    </div>
+  </section>
+</div>
+
+<footer><p>PPG Delay Chain &nbsp;·&nbsp; HSPICE T-2022.06-SP2 &nbsp;·&nbsp; v0.6SB ULVT &nbsp;·&nbsp; Made with IBM Bob</p></footer>
+
+<script>
+const RAW=[
+  {tsl:'6',cell:'INV',    delay:9.617, ceff:4.125,reff:2332,iddq:0.0555,idda:214.3},
+  {tsl:'6',cell:'NAND2B', delay:16.716,ceff:3.709,reff:4507,iddq:0.0319,idda:110.9},
+  {tsl:'6',cell:'NOR2B',  delay:18.348,ceff:3.732,reff:4917,iddq:0.0505,idda:101.6},
+  {tsl:'6',cell:'NAND3B', delay:21.800,ceff:4.240,reff:5141,iddq:0.0354,idda:97.18},
+  {tsl:'6',cell:'AOI21',  delay:23.237,ceff:4.002,reff:5807,iddq:0.0538,idda:85.99},
+  {tsl:'6',cell:'AOI22',  delay:26.396,ceff:4.273,reff:6178,iddq:0.0545,idda:80.81},
+  {tsl:'6',cell:'OAI21',  delay:23.472,ceff:3.966,reff:5919,iddq:0.0540,idda:84.36},
+  {tsl:'6',cell:'OAI22',  delay:24.479,ceff:4.334,reff:5648,iddq:0.0517,idda:88.41},
+  {tsl:'7',cell:'INV',    delay:8.182, ceff:5.299,reff:1544,iddq:0.1087,idda:323.6},
+  {tsl:'7',cell:'NAND2B', delay:13.147,ceff:4.642,reff:2832,iddq:0.0628,idda:176.4},
+  {tsl:'7',cell:'NOR2B',  delay:14.428,ceff:4.671,reff:3089,iddq:0.0985,idda:161.6},
+  {tsl:'7',cell:'NAND3B', delay:17.156,ceff:5.312,reff:3230,iddq:0.0698,idda:154.7},
+  {tsl:'7',cell:'AOI21',  delay:18.390,ceff:5.038,reff:3650,iddq:0.1050,idda:136.8},
+  {tsl:'7',cell:'AOI22',  delay:20.731,ceff:5.359,reff:3869,iddq:0.1062,idda:129.0},
+  {tsl:'7',cell:'OAI21',  delay:18.584,ceff:5.002,reff:3716,iddq:0.1050,idda:134.3},
+  {tsl:'7',cell:'OAI22',  delay:19.419,ceff:5.473,reff:3548,iddq:0.1005,idda:140.7},
+  {tsl:'8',cell:'INV',    delay:7.661, ceff:6.503,reff:1178,iddq:0.1584,idda:424.1},
+  {tsl:'8',cell:'NAND2B', delay:11.680,ceff:5.603,reff:2084,iddq:0.0921,idda:239.7},
+  {tsl:'8',cell:'NOR2B',  delay:12.749,ceff:5.628,reff:2265,iddq:0.1428,idda:220.4},
+  {tsl:'8',cell:'NAND3B', delay:15.105,ceff:6.375,reff:2369,iddq:0.1029,idda:210.8},
+  {tsl:'8',cell:'AOI21',  delay:16.276,ceff:6.091,reff:2672,iddq:0.1527,idda:186.8},
+  {tsl:'8',cell:'AOI22',  delay:18.249,ceff:6.463,reff:2824,iddq:0.1544,idda:176.7},
+  {tsl:'8',cell:'OAI21',  delay:16.506,ceff:6.064,reff:2722,iddq:0.1527,idda:183.3},
+  {tsl:'8',cell:'OAI22',  delay:17.228,ceff:6.625,reff:2601,iddq:0.1457,idda:191.9},
+];
+const CELLS=['INV','NAND2B','NOR2B','NAND3B','AOI21','AOI22','OAI21','OAI22'];
+const COLORS={'6':'#3b82d4','7':'#7c5cd8','8':'#e07b39'};
+const TSL_CLASS={'6':'tsl6','7':'tsl7','8':'tsl8'};
+let activeTSL=new Set(['6','7','8']),activeCells=new Set(CELLS);
+let sortCol=2,sortDir=1;
+
+function setFilter(type,val){
+  if(type==='tsl'){
+    if(activeTSL.has(val))activeTSL.delete(val);else activeTSL.add(val);
+    const cls=val==='7'?' purple':val==='8'?' orange':'';
+    document.getElementById('f'+val).className=activeTSL.has(val)?'btn active'+cls:'btn';
+  }else{
+    if(activeCells.has(val))activeCells.delete(val);else activeCells.add(val);
+    document.getElementById('f'+val).className=activeCells.has(val)?'btn active':'btn';
+  }
+  refresh();
+}
+function resetFilters(){
+  activeTSL=new Set(['6','7','8']);activeCells=new Set(CELLS);
+  document.getElementById('f6').className='btn active';
+  document.getElementById('f7').className='btn active purple';
+  document.getElementById('f8').className='btn active orange';
+  CELLS.forEach(c=>document.getElementById('f'+c).className='btn active');
+  refresh();
+}
+function filtered(){return RAW.filter(d=>activeTSL.has(d.tsl)&&activeCells.has(d.cell));}
+
+function sortTable(col){
+  if(sortCol===col)sortDir*=-1;else{sortCol=col;sortDir=1;}
+  document.querySelectorAll('.sort-icon').forEach((el,i)=>{el.textContent=i===col?(sortDir===1?'↑':'↓'):'↕';});
+  renderTable();
+}
+function renderTable(){
+  const data=filtered();
+  if(!data.length){document.getElementById('table-body').innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">No data — adjust filters</td></tr>';return;}
+  const maxDelay=Math.max(...data.map(d=>d.delay));
+  const cols=[d=>d.cell,d=>d.tsl,d=>d.delay,d=>d.ceff,d=>d.reff,d=>d.iddq,d=>d.idda];
+  const sorted=[...data].sort((a,b)=>{const va=cols[sortCol](a),vb=cols[sortCol](b);return typeof va==='string'?sortDir*va.localeCompare(vb):sortDir*(va-vb);});
+  document.getElementById('table-body').innerHTML=sorted.map(d=>{
+    const pct=(d.delay/maxDelay*100).toFixed(1);
+    return `<tr>
+      <td class="cell-name">${d.cell}</td>
+      <td><span class="tsl-chip ${TSL_CLASS[d.tsl]}">${d.tsl}TSL</span></td>
+      <td><div class="bar-cell"><span style="min-width:38px">${d.delay.toFixed(2)}</span><div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${COLORS[d.tsl]}"></div></div></div></td>
+      <td>${d.ceff.toFixed(3)}</td>
+      <td>${d.reff.toFixed(0)}</td>
+      <td>${d.iddq.toFixed(4)}</td>
+      <td>${d.idda.toFixed(1)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function drawBar(id,getter,yLabel,fmt){
+  const canvas=document.getElementById(id);if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  const W=canvas.parentElement.clientWidth-32,H=260;
+  canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.width=W+'px';canvas.style.height=H+'px';
+  ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
+  const tsls=[...activeTSL].sort();
+  const cells=CELLS.filter(c=>activeCells.has(c));
+  if(!cells.length||!tsls.length){ctx.fillStyle='#999';ctx.font='13px sans-serif';ctx.textAlign='center';ctx.fillText('No data — adjust filters',W/2,H/2);return;}
+  const padL=56,padR=12,padT=16,padB=56;
+  const cW=W-padL-padR,cH=H-padT-padB;
+  const vals=RAW.filter(d=>activeTSL.has(d.tsl)&&activeCells.has(d.cell)).map(getter);
+  const maxV=Math.max(...vals)*1.15;
+  ctx.strokeStyle='#e5e7eb';ctx.lineWidth=1;
+  for(let i=0;i<=5;i++){
+    const v=maxV*i/5,y=padT+cH-cH*i/5;
+    ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(padL+cW,y);ctx.stroke();
+    ctx.fillStyle='#57606a';ctx.font='10px sans-serif';ctx.textAlign='right';
+    ctx.fillText(fmt(v),padL-4,y+3);
+  }
+  const gW=cW/cells.length;
+  const bW=Math.min((gW/tsls.length)*0.72,26);
+  cells.forEach((cell,ci)=>{
+    const gx=padL+ci*gW;
+    const gap=(gW-bW*tsls.length)/2;
+    tsls.forEach((tsl,ti)=>{
+      const row=RAW.find(d=>d.tsl===tsl&&d.cell===cell);if(!row)return;
+      const v=getter(row),bh=(v/maxV)*cH,bx=gx+gap+ti*bW,by=padT+cH-bh;
+      ctx.fillStyle=COLORS[tsl];
+      ctx.beginPath();
+      if(ctx.roundRect)ctx.roundRect(bx,by,bW-2,bh,[3,3,0,0]);
+      else ctx.rect(bx,by,bW-2,bh);
+      ctx.fill();
+    });
+    ctx.fillStyle='#57606a';ctx.font='10px sans-serif';ctx.textAlign='center';
+    ctx.fillText(cell,gx+gW/2,H-padB+14);
+  });
+  tsls.forEach((tsl,i)=>{
+    const lx=padL+i*60,ly=H-8;
+    ctx.fillStyle=COLORS[tsl];ctx.fillRect(lx,ly-8,10,8);
+    ctx.fillStyle='#57606a';ctx.font='10px sans-serif';ctx.textAlign='left';
+    ctx.fillText(tsl+'TSL',lx+13,ly);
+  });
+  ctx.save();ctx.translate(11,padT+cH/2);ctx.rotate(-Math.PI/2);
+  ctx.fillStyle='#57606a';ctx.font='10px sans-serif';ctx.textAlign='center';
+  ctx.fillText(yLabel,0,0);ctx.restore();
+}
+
+function drawScatter(id){
+  const canvas=document.getElementById(id);if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  const W=canvas.parentElement.clientWidth-32,H=260;
+  canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.width=W+'px';canvas.style.height=H+'px';
+  ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
+  const data=filtered();
+  if(!data.length){ctx.fillStyle='#999';ctx.font='13px sans-serif';ctx.textAlign='center';ctx.fillText('No data',W/2,H/2);return;}
+  const padL=56,padR=12,padT=16,padB=56;
+  const cW=W-padL-padR,cH=H-padT-padB;
+  const maxX=Math.max(...data.map(d=>d.iddq))*1.2;
+  const maxY=Math.max(...data.map(d=>d.idda))*1.2;
+  ctx.strokeStyle='#e5e7eb';ctx.lineWidth=1;
+  for(let i=0;i<=5;i++){
+    const y=padT+cH-cH*i/5,x=padL+cW*i/5;
+    ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(padL+cW,y);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x,padT);ctx.lineTo(x,padT+cH);ctx.stroke();
+    ctx.fillStyle='#57606a';ctx.font='10px sans-serif';
+    ctx.textAlign='right';ctx.fillText((maxY*i/5).toFixed(0),padL-4,y+3);
+    ctx.textAlign='center';ctx.fillText((maxX*i/5).toFixed(3),x,padT+cH+14);
+  }
+  data.forEach(d=>{
+    const px=padL+(d.iddq/maxX)*cW,py=padT+cH-(d.idda/maxY)*cH;
+    ctx.beginPath();ctx.arc(px,py,5,0,Math.PI*2);
+    ctx.fillStyle=COLORS[d.tsl]+'bb';ctx.fill();
+    ctx.strokeStyle=COLORS[d.tsl];ctx.lineWidth=1.5;ctx.stroke();
+    ctx.fillStyle='#57606a';ctx.font='9px sans-serif';ctx.textAlign='left';
+    ctx.fillText(d.cell,px+7,py+3);
+  });
+  [...activeTSL].sort().forEach((tsl,i)=>{
+    const lx=padL+i*60,ly=H-8;
+    ctx.fillStyle=COLORS[tsl];ctx.fillRect(lx,ly-8,10,8);
+    ctx.fillStyle='#57606a';ctx.font='10px sans-serif';ctx.textAlign='left';
+    ctx.fillText(tsl+'TSL',lx+13,ly);
+  });
+  ctx.save();ctx.translate(11,padT+cH/2);ctx.rotate(-Math.PI/2);
+  ctx.fillStyle='#57606a';ctx.font='10px sans-serif';ctx.textAlign='center';
+  ctx.fillText('Idda rail (µA)',0,0);ctx.restore();
+  ctx.fillStyle='#57606a';ctx.font='10px sans-serif';ctx.textAlign='center';
+  ctx.fillText('Iddq (µA)',padL+cW/2,H-4);
+}
+
+function refresh(){
+  renderTable();
+  drawBar('chart-delay',d=>d.delay,'ps',v=>v.toFixed(1));
+  drawBar('chart-ceff', d=>d.ceff, 'aF',v=>v.toFixed(2));
+  drawBar('chart-reff', d=>d.reff, 'Ω', v=>Math.round(v));
+  drawScatter('chart-iddq');
+}
+window.addEventListener('resize',refresh);
+refresh();
+</script>
+</body>
+</html>
