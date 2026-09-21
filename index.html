@@ -94,8 +94,15 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
 
 <!-- SECTION 1 -->
 <section>
-  <div class="section-title"><span class="bar"></span>Stage Delay vs VDD — All Cells</div>
+  <div class="section-title"><span class="bar"></span><span id="sweep-title">Stage Delay vs VDD — All Cells</span></div>
   <div class="controls">
+    <label>Metric:</label>
+    <button class="btn active" data-sm="stage_delay" onclick="setSweepMetric(this)">Stage Delay</button>
+    <button class="btn"        data-sm="iddq"        onclick="setSweepMetric(this)">IDDQ</button>
+    <button class="btn"        data-sm="iddarail"    onclick="setSweepMetric(this)">IDDArail</button>
+    <button class="btn"        data-sm="acceff"      onclick="setSweepMetric(this)">ACCeff</button>
+    <button class="btn"        data-sm="acreff"      onclick="setSweepMetric(this)">ACReff</button>
+    <div class="sep"></div>
     <label>TSL:</label>
     <button class="btn active"   id="f6" onclick="toggleTsl(6)">6TSL</button>
     <button class="btn active p" id="f7" onclick="toggleTsl(7)">7TSL</button>
@@ -118,25 +125,40 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
 
 <!-- SECTION 2 -->
 <section>
-  <div class="section-title"><span class="bar"></span>Metrics at Selected VDD</div>
-  <div class="vdd-row" id="vdd-row"></div>
-  <div class="controls">
-    <label>Metric:</label>
-    <button class="btn active" data-m="stage_delay" onclick="setMetric(this)">Stage Delay (ps)</button>
-    <button class="btn"        data-m="iddq"        onclick="setMetric(this)">IDDQ (A)</button>
-    <button class="btn"        data-m="iddarail"    onclick="setMetric(this)">IDDArail (A)</button>
-    <button class="btn"        data-m="acceff"      onclick="setMetric(this)">ACCeff (F)</button>
-    <button class="btn"        data-m="acreff"      onclick="setMetric(this)">ACReff (Ω)</button>
+  <div class="section-title"><span class="bar"></span>Data Table — Multi-VDD &amp; Multi-Metric</div>
+
+  <!-- Mode toggle -->
+  <div class="controls" style="margin-bottom:10px">
+    <label>View mode:</label>
+    <button class="btn active" id="mode-mv" onclick="setMode('multi_vdd')">Multiple VDDs, one metric</button>
+    <button class="btn"        id="mode-mm" onclick="setMode('multi_met')">All metrics, one VDD</button>
+    <button class="btn"        id="mode-full" onclick="setMode('full')">All metrics × all selected VDDs</button>
   </div>
-  <div class="table-wrap"><table>
-    <thead><tr>
-      <th>TSL</th><th>Cell</th>
-      <th id="th-val" style="text-align:right">Stage Delay (ps)</th>
-      <th style="text-align:right">vs 6TSL</th>
-      <th style="min-width:140px">Bar</th>
-    </tr></thead>
-    <tbody id="metric-tbody"></tbody>
-  </table></div>
+
+  <!-- VDD selector row (multi-select) -->
+  <div style="margin-bottom:8px;font-size:12px;color:var(--muted)">
+    <span id="vdd-hint">Click to toggle VDD columns (multiple allowed):</span>
+  </div>
+  <div class="vdd-row" id="vdd-row"></div>
+
+  <!-- Metric selector row (multi-select) -->
+  <div style="margin-bottom:8px;font-size:12px;color:var(--muted)" id="met-hint-wrap">
+    <span>Click to toggle metric columns (multiple allowed):</span>
+  </div>
+  <div class="controls" id="metric-row">
+    <button class="btn active" data-m="stage_delay" onclick="toggleMetric(this)">Stage Delay (ps)</button>
+    <button class="btn"        data-m="iddq"        onclick="toggleMetric(this)">IDDQ (A)</button>
+    <button class="btn"        data-m="iddarail"    onclick="toggleMetric(this)">IDDArail (A)</button>
+    <button class="btn"        data-m="acceff"      onclick="toggleMetric(this)">ACCeff (F)</button>
+    <button class="btn"        data-m="acreff"      onclick="toggleMetric(this)">ACReff (Ω)</button>
+  </div>
+
+  <div class="table-wrap" style="margin-top:14px">
+    <table id="main-table">
+      <thead id="main-thead"></thead>
+      <tbody id="metric-tbody"></tbody>
+    </table>
+  </div>
 </section>
 
 <!-- SECTION 3: Correlation charts -->
@@ -334,7 +356,14 @@ r('8TSL_OAI22','acreff',[2600.6,2235.84,1966.88,1762.53,1601.92,1472.51,1366.92,
 // ═══════════════════════════════════════════════════════════════════
 // STATE & COLOR TABLES
 // ═══════════════════════════════════════════════════════════════════
-let vddIdx=13, curMetric='stage_delay';
+// vddIdx: primary VDD used by charts / KPIs (last selected)
+let vddIdx=13;
+// selectedVdds: SET of VDD indices shown as table columns (multi-select)
+let selectedVdds=new Set([13]);
+// selectedMetrics: SET of metric keys shown as table columns (multi-select)
+let selectedMetrics=new Set(['stage_delay']);
+// tableMode: 'multi_vdd' | 'multi_met' | 'full'
+let tableMode='multi_vdd';
 let showTsl={6:true,7:true,8:true};
 let showCell={INV:true,NAND2B:true,NOR2B:true,NAND3B:true,AOI21:true,AOI22:true,OAI21:true,OAI22:true};
 
@@ -378,15 +407,30 @@ function gridOpts(xTitle,yTitle){
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// VDD PILLS
+// VDD PILLS — multi-select for table; last clicked = vddIdx for charts
 // ═══════════════════════════════════════════════════════════════════
 function buildVddPills(){
   const row=document.getElementById('vdd-row'); row.innerHTML='';
   VDD.forEach((v,i)=>{
     const b=document.createElement('button');
-    b.className='vdd-pill'+(i===vddIdx?' active':'');
-    b.textContent=v+'V';
-    b.onclick=()=>{vddIdx=i;renderAll();};
+    // active = selected in table; primary = the vddIdx (yellow star)
+    const isSel=selectedVdds.has(i);
+    b.className='vdd-pill'+(isSel?' active':'');
+    b.title='Click: toggle column. Ctrl+click: set as primary VDD for charts.';
+    b.innerHTML=v+'V'+(i===vddIdx?' <span style="font-size:9px;vertical-align:super">★</span>':'');
+    b.onclick=(e)=>{
+      if(e.ctrlKey||e.metaKey){
+        // Ctrl+click = set primary VDD for charts only (don't toggle column)
+        vddIdx=i;
+      } else {
+        // toggle column selection; if deselecting all, keep at least one
+        if(selectedVdds.has(i)&&selectedVdds.size>1) selectedVdds.delete(i);
+        else selectedVdds.add(i);
+        // last added = primary vddIdx for charts
+        vddIdx=i;
+      }
+      renderAll();
+    };
     row.appendChild(b);
   });
 }
@@ -438,50 +482,195 @@ function buildKpis(){
 // ═══════════════════════════════════════════════════════════════════
 // SECTION 1: Sweep line chart
 // ═══════════════════════════════════════════════════════════════════
+let sweepMetric='stage_delay';
+
+function setSweepMetric(btn){
+  sweepMetric=btn.dataset.sm;
+  document.querySelectorAll('[data-sm]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('sweep-title').textContent=METRICS_LABEL[sweepMetric]+' vs VDD — All Cells';
+  // destroy old chart so y-axis rescales for the new metric
+  if(sweepObj){sweepObj.destroy();sweepObj=null;}
+  buildSweepChart();
+}
+
 function buildSweepChart(){
+  const m=sweepMetric;
+  const yLabel=METRICS_LABEL[m];
+  // scale raw values for display (convert to sensible units)
+  const scale=m==='iddq'?1e9:m==='iddarail'?1e6:m==='acceff'?1e15:1;
+  const unit=m==='iddq'?' nA':m==='iddarail'?' μA':m==='acceff'?' fF':m==='acreff'?' Ω':' ps';
+  const yAxisLabel=m==='iddq'?'IDDQ (nA)':m==='iddarail'?'IDDArail (μA)':m==='acceff'?'ACCeff (fF)':m==='acreff'?'ACReff (Ω)':'Stage Delay (ps)';
+
   const datasets=CELLS.filter(isVisible).map(c=>{
     const tsl=cellTsl(c), ct=cellType(c);
     const col=CELL_COLOR[ct];
-    // TSL encoding: 6=solid, 7=dashed, 8=dotted
     const dash=tsl==='7TSL'?[6,3]:tsl==='8TSL'?[2,3]:undefined;
-    return{label:c,data:D[c].stage_delay,borderColor:col,backgroundColor:'transparent',
+    return{label:c,data:D[c][m].map(v=>v*scale),borderColor:col,backgroundColor:'transparent',
            borderWidth:tsl==='6TSL'?2:1.5,borderDash:dash,pointRadius:2.5,tension:.3};
   });
-  const opts=gridOpts('VDD (V)','Stage Delay (ps)');
+  const opts=gridOpts('VDD (V)',yAxisLabel);
   opts.plugins.legend={display:false};
-  opts.plugins.tooltip={callbacks:{title:i=>'VDD = '+i[0].label,label:i=>i.dataset.label+': '+i.raw.toFixed(3)+' ps'}};
-  if(sweepObj){sweepObj.data.datasets=datasets;sweepObj.update();return;}
+  opts.plugins.tooltip={callbacks:{
+    title:i=>'VDD = '+i[0].label,
+    label:i=>{
+      const raw=i.raw;
+      const disp=m==='stage_delay'||m==='acreff'?raw.toFixed(3):raw.toExponential(3);
+      return i.dataset.label+': '+disp+unit;
+    }
+  }};
+  if(sweepObj){sweepObj.data.datasets=datasets;sweepObj.options.scales.y.title.text=yAxisLabel;sweepObj.update();return;}
   sweepObj=new Chart(document.getElementById('sweepChart'),
     {type:'line',data:{labels:VDD.map(v=>v+'V'),datasets},options:opts});
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// SECTION 2: Metric table
+// SECTION 2: Multi-VDD / Multi-Metric Table
 // ═══════════════════════════════════════════════════════════════════
+
+// Apply mode constraints to selectedVdds / selectedMetrics
+function applyModeConstraints(){
+  if(tableMode==='multi_vdd'){
+    // one metric only — keep whichever was last active
+    const m=[...selectedMetrics][selectedMetrics.size-1]||'stage_delay';
+    selectedMetrics=new Set([m]);
+    // show metric row, hide nothing
+    document.getElementById('metric-row').style.display='';
+    document.getElementById('met-hint-wrap').style.display='';
+    document.getElementById('vdd-hint').textContent='Click VDD pills to toggle columns (multiple allowed):';
+  } else if(tableMode==='multi_met'){
+    // all 5 metrics, one VDD only — keep vddIdx
+    selectedMetrics=new Set(Object.keys(METRICS_LABEL));
+    selectedVdds=new Set([vddIdx]);
+    // hide metric row (forced all)
+    document.getElementById('metric-row').style.display='none';
+    document.getElementById('met-hint-wrap').style.display='none';
+    document.getElementById('vdd-hint').textContent='Click a VDD pill to select voltage:';
+  } else { // full
+    // all metrics, keep all selected VDDs
+    selectedMetrics=new Set(Object.keys(METRICS_LABEL));
+    document.getElementById('metric-row').style.display='none';
+    document.getElementById('met-hint-wrap').style.display='none';
+    document.getElementById('vdd-hint').textContent='Click VDD pills to toggle columns:';
+  }
+  // sync metric btn visuals
+  document.querySelectorAll('[data-m]').forEach(b=>{
+    b.classList.toggle('active', selectedMetrics.has(b.dataset.m));
+  });
+}
+
 function buildMetricTable(){
-  document.getElementById('th-val').textContent=METRICS_LABEL[curMetric];
-  const rows=CELLS.map(c=>({c,v:D[c][curMetric][vddIdx],tsl:cellTsl(c),ct:cellType(c)}));
-  const mn=Math.min(...rows.map(r=>r.v)), mx=Math.max(...rows.map(r=>r.v));
+  applyModeConstraints();
+
+  const vdds=VDD.map((_,i)=>i).filter(i=>selectedVdds.has(i));
+  const metrics=[...selectedMetrics];
+  const ALL_METRICS=Object.keys(METRICS_LABEL);
+
+  // build global min/max per metric across selected VDDs (for bar colouring)
+  const rangeOf={};
+  metrics.forEach(m=>{
+    const vals=CELLS.flatMap(c=>vdds.map(vi=>D[c][m][vi]));
+    rangeOf[m]={mn:Math.min(...vals),mx:Math.max(...vals)};
+  });
+
+  // ── HEADER ──
+  const thead=document.getElementById('main-thead');
+  thead.innerHTML='';
+  const tr1=document.createElement('tr');
+  // fixed cols
+  tr1.innerHTML='<th rowspan="2">TSL</th><th rowspan="2">Cell</th>';
+
+  if(tableMode==='multi_vdd'){
+    // one metric, N VDD columns each with "vs 6TSL" sub-col
+    tr1.innerHTML+=vdds.map(vi=>`<th colspan="2" style="text-align:center;border-left:1px solid var(--border)">${VDD[vi]}V${vi===vddIdx?' ★':''}</th>`).join('');
+    const tr2=document.createElement('tr');
+    tr2.innerHTML=vdds.map(()=>`<th style="text-align:right;border-left:1px solid var(--border)">${METRICS_LABEL[metrics[0]]}</th><th style="text-align:right">vs 6TSL</th>`).join('');
+    thead.appendChild(tr1); thead.appendChild(tr2);
+  } else if(tableMode==='multi_met'){
+    // N metric cols at one VDD
+    tr1.innerHTML+=metrics.map(m=>`<th style="text-align:right;border-left:1px solid var(--border)">${METRICS_LABEL[m]}</th>`).join('');
+    tr1.innerHTML+=metrics.map(m=>`<th style="text-align:right">vs 6TSL</th>`).join('');
+    // collapse to single header row
+    // actually put value+vs6TSL side by side per metric in one row
+    thead.innerHTML='';
+    const hdr=document.createElement('tr');
+    hdr.innerHTML='<th>TSL</th><th>Cell</th>';
+    metrics.forEach(m=>{
+      hdr.innerHTML+=`<th style="text-align:right;border-left:1px solid var(--border)">${METRICS_LABEL[m]}</th>`;
+      hdr.innerHTML+=`<th style="text-align:right;font-size:10px;color:var(--muted)">vs 6TSL</th>`;
+    });
+    thead.appendChild(hdr);
+  } else {
+    // full: metrics as top-level groups, VDDs as sub-cols
+    metrics.forEach((m,mi)=>{
+      tr1.innerHTML+=`<th colspan="${vdds.length}" style="text-align:center;border-left:2px solid var(--border);color:var(--text)">${METRICS_LABEL[m]}</th>`;
+    });
+    const tr2=document.createElement('tr');
+    metrics.forEach(m=>{
+      vdds.forEach(vi=>{
+        tr2.innerHTML+=`<th style="text-align:right;border-left:1px solid var(--border);font-size:10px">${VDD[vi]}V${vi===vddIdx?' ★':''}</th>`;
+      });
+    });
+    thead.appendChild(tr1); thead.appendChild(tr2);
+  }
+
+  // ── BODY ──
   const tb=document.getElementById('metric-tbody'); tb.innerHTML='';
+
   ['6TSL','7TSL','8TSL'].forEach(tsl=>{
     if(!showTsl[parseInt(tsl)])return;
+    const span=tableMode==='multi_vdd'? vdds.length*2+2 : tableMode==='multi_met'? metrics.length*2+2 : metrics.length*vdds.length+2;
     const hdr=document.createElement('tr');
-    hdr.innerHTML=`<td colspan="5" style="background:${TSL_COLOR[tsl]}12;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:${TSL_COLOR[tsl]};padding:7px 12px;border-top:2px solid ${TSL_COLOR[tsl]}40">${tsl}</td>`;
+    hdr.innerHTML=`<td colspan="${span}" style="background:${TSL_COLOR[tsl]}10;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:${TSL_COLOR[tsl]};padding:6px 12px;border-top:2px solid ${TSL_COLOR[tsl]}35">${tsl}</td>`;
     tb.appendChild(hdr);
-    rows.filter(r=>r.tsl===tsl&&showCell[r.ct]).forEach(row=>{
-      const base6=D['6TSL_'+row.ct]?.[curMetric]?.[vddIdx]??null;
-      const pct=base6!=null&&row.tsl!=='6TSL'?((base6-row.v)/base6*100):null;
-      const pctStr=pct!=null?`<span style="color:${pct>0?'#00ff9f':'#ff2d78'}">${pct>0?'↓':'↑'}${Math.abs(pct).toFixed(1)}%</span>`:'—';
-      const t=(row.v-mn)/(mx-mn||1);
-      const col=`hsl(${200-t*150},100%,62%)`;
-      const pct2=Math.round(t*100);
-      const tslN=parseInt(tsl);
+
+    CELL_TYPES.filter(ct=>showCell[ct]).forEach(ct=>{
+      const c=tsl+'_'+ct;
       const tr=document.createElement('tr');
-      tr.innerHTML=`<td><span class="chip chip${tslN}">${tsl}</span></td>
-        <td style="font-weight:600;color:${CELL_COLOR[row.ct]}">${row.ct}</td>
-        <td class="mono" style="text-align:right;color:${col}">${fmt(row.v,curMetric)}</td>
-        <td style="text-align:right">${pctStr}</td>
-        <td><div class="bar-track"><div class="bar-fill" style="width:${pct2}%;background:linear-gradient(90deg,${col},${col}80)"></div></div></td>`;
+      let html=`<td><span class="chip chip${parseInt(tsl)}">${tsl}</span></td>
+                <td style="font-weight:600;color:${CELL_COLOR[ct]}">${ct}</td>`;
+
+      if(tableMode==='multi_vdd'){
+        const m=metrics[0];
+        const {mn,mx}=rangeOf[m];
+        vdds.forEach(vi=>{
+          const v=D[c][m][vi];
+          const base6=D['6TSL_'+ct]?.[m]?.[vi]??null;
+          const pct=base6!=null&&tsl!=='6TSL'?((base6-v)/base6*100):null;
+          const pctStr=pct!=null?`<span style="color:${pct>0?'#00ff9f':'#ff2d78'}">${pct>0?'↓':'↑'}${Math.abs(pct).toFixed(1)}%</span>`:'—';
+          const t=(v-mn)/(mx-mn||1);
+          const col=`hsl(${200-t*150},100%,62%)`;
+          const pct2=Math.round(t*100);
+          html+=`<td class="mono" style="text-align:right;color:${col};border-left:1px solid var(--border)">${fmt(v,m)}</td>
+                 <td style="text-align:right;font-size:11px">${pctStr}</td>`;
+        });
+      } else if(tableMode==='multi_met'){
+        const vi=vdds[0]??vddIdx;
+        metrics.forEach(m=>{
+          const {mn,mx}=rangeOf[m];
+          const v=D[c][m][vi];
+          const base6=D['6TSL_'+ct]?.[m]?.[vi]??null;
+          const pct=base6!=null&&tsl!=='6TSL'?((base6-v)/base6*100):null;
+          const pctStr=pct!=null?`<span style="color:${pct>0?'#00ff9f':'#ff2d78'}">${pct>0?'↓':'↑'}${Math.abs(pct).toFixed(1)}%</span>`:'—';
+          const t=(v-mn)/(mx-mn||1);
+          const col=`hsl(${200-t*150},100%,62%)`;
+          html+=`<td class="mono" style="text-align:right;color:${col};border-left:1px solid var(--border)">${fmt(v,m)}</td>
+                 <td style="text-align:right;font-size:11px">${pctStr}</td>`;
+        });
+      } else {
+        // full
+        metrics.forEach(m=>{
+          const {mn,mx}=rangeOf[m];
+          vdds.forEach(vi=>{
+            const v=D[c][m][vi];
+            const t=(v-mn)/(mx-mn||1);
+            const col=`hsl(${200-t*150},100%,62%)`;
+            html+=`<td class="mono" style="text-align:right;color:${col};border-left:1px solid var(--border)">${fmt(v,m)}</td>`;
+          });
+        });
+      }
+
+      tr.innerHTML=html;
       tb.appendChild(tr);
     });
   });
@@ -725,10 +914,18 @@ function resetFilters(){
   CELL_TYPES.forEach(ct=>document.getElementById('fc'+ct).classList.add('active'));
   renderAll();
 }
-function setMetric(btn){
-  curMetric=btn.dataset.m;
-  document.querySelectorAll('[data-m]').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
+function setMode(m){
+  tableMode=m;
+  document.querySelectorAll('[id^="mode-"]').forEach(b=>b.classList.remove('active'));
+  document.getElementById('mode-'+{multi_vdd:'mv',multi_met:'mm',full:'full'}[m]).classList.add('active');
+  buildMetricTable();
+  buildVddPills();
+}
+function toggleMetric(btn){
+  const m=btn.dataset.m;
+  if(tableMode!=='multi_vdd') return; // only meaningful in multi_vdd mode
+  if(selectedMetrics.has(m)&&selectedMetrics.size>1) selectedMetrics.delete(m);
+  else selectedMetrics.add(m);
   buildMetricTable();
 }
 
