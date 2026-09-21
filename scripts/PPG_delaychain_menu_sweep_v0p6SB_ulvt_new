@@ -1,0 +1,218 @@
+#!/usr/bin/ksh
+#=============================================================================
+# Script  : PPG_delaychain_menu_sweep_v0p6SB_ulvt_new
+# Purpose : Run HSPICE delay-chain simulations for a matrix of cell types
+#           and track heights (6TSL / 7TSL / 8TSL) using the v0.6SB ULVT
+#           SPICE model.  Results are collected into PPGRO_chain_menu.txt.
+#
+# Flow per cell:
+#   1. Prepare PPGchain.spf  — process the StarRC SPF file:
+#        - Rename port order to VSS VDD A Z
+#        - Substitute slvt -> ulvt Vt flavour
+#   2. Prepare invfo3_mod.sp — patch the template netlist:
+#        - Replace .Titan_spf placeholder with PPGchain.spf path
+#        - Replace .Titan_RO placeholder with the real subcircuit name
+#   3. Submit HSPICE to LSF via bsub (all 24 jobs submitted in parallel)
+#   4. Wait for all jobs to finish, then extract key metrics from each
+#      .lis log into PPGRO_chain_menu.txt
+#
+# Output files kept after each run (under run/<label>/):
+#   invfo3_mod.sp.lis        — full simulation log
+#   invfo3_mod.mt0           — raw .measure results
+#   PPGRO_chain_menu.txt     — summary of all metrics across all cells
+#=============================================================================
+
+#-----------------------------------------------------------------------------
+# Configuration
+#-----------------------------------------------------------------------------
+
+# Directory containing hsp_2022_new and this script
+SCRIPTDIR='/afs/apd.pok.ibm.com/u/imranyou/for_imran'
+
+# Root directory for the StarRC SPF source files
+SPFDIR='/gpfs/projects/t/titan/dtco/usr/sbajaj/SPF_files/tpdk0.6sb'
+
+# Template HSPICE netlist (contains .Titan_spf and .Titan_RO placeholders)
+# Must be absolute so it resolves from inside each per-cell run subdirectory
+TEMPLATE="$SCRIPTDIR/invfo3_sweep.sp"
+
+# Intermediate filenames used inside each per-cell subdirectory
+SPF_OUT='PPGchain.spf'
+NETLIST='invfo3_mod.sp'
+
+# Summary results file (created fresh, then appended each iteration)
+RESULTS="$SCRIPTDIR/PPGRO_chain_menu.txt"
+
+# LSF resource requirements — same as full_dut/lsfHsp
+LSF_SELECT='(osver==rh8) && (type == X86_64) && ! etx && ! nojobs'
+LSF_JOBPREFIX='PPGsim'
+
+# Ordered list of all cell labels — used during results collection
+CELL_LABELS=''
+
+#-----------------------------------------------------------------------------
+# sed expressions to normalise the SUBCKT port order to: VSS VDD A Z
+# Each rule matches a specific wrong ordering by port name so that only
+# lines with that exact ordering are rewritten.  This is needed because
+# the failing AOI21/OAI21/OAI22 SPF files ship ports in a different order
+# than INV/NAND/NOR/AOI22 cells.
+#
+# Orderings seen in the SPF library:
+#   VSS VDD A Z   — already correct  (INV, NAND2B, NOR2B, NAND3B, AOI22)
+#   Z   VDD A VSS — AOI21 (6TSL, 8TSL)
+#   VDD Z   A VSS — AOI21 (7TSL)
+#   A   VDD Z VSS — OAI21, OAI22 (all TSL)
+#
+# Also substitutes slvt -> ulvt device flavour throughout the SPF
+#-----------------------------------------------------------------------------
+# reorder:  Z VDD A VSS  ->  VSS VDD A Z
+SUBCKT_SED_1='s/\.SUBCKT \([0-9a-zA-Z*_]*\) Z VDD A VSS/.SUBCKT \1 VSS VDD A Z/g'
+# reorder:  VDD Z A VSS  ->  VSS VDD A Z
+SUBCKT_SED_2='s/\.SUBCKT \([0-9a-zA-Z*_]*\) VDD Z A VSS/.SUBCKT \1 VSS VDD A Z/g'
+# reorder:  A VDD Z VSS  ->  VSS VDD A Z
+SUBCKT_SED_3='s/\.SUBCKT \([0-9a-zA-Z*_]*\) A VDD Z VSS/.SUBCKT \1 VSS VDD A Z/g'
+VT_SED_N='s^.slvtnfet^ ulvtnfet^'
+VT_SED_P='s^.slvtpfet^ ulvtpfet^'
+
+#-----------------------------------------------------------------------------
+# Helper function: run_cell <label> <spf_file> <subckt_name>
+#
+#   label       — human-readable tag written to the results file, e.g. 6TSL_INV
+#   spf_file    — full path to the source StarRC .spf file
+#   subckt_name — SUBCKT name inside that SPF, e.g. PPG1_INV_X2_6TSL
+#
+# This function prepares the per-cell input files and submits to LSF.
+# It does NOT wait — all 24 jobs run in parallel.
+#-----------------------------------------------------------------------------
+run_cell() {
+    label=$1
+    spf_file=$2
+    subckt=$3
+
+    echo "------------------------------------------------------------"
+    echo " Submitting: $label"
+    echo "------------------------------------------------------------"
+
+    # Create an isolated working directory for this cell
+    rundir="$SCRIPTDIR/run/$label"
+    mkdir -p $rundir
+
+    # Step 1: Process SPF — normalise port order and swap Vt flavour
+    sed -e "$SUBCKT_SED_1" \
+        -e "$SUBCKT_SED_2" \
+        -e "$SUBCKT_SED_3" \
+        -e "$VT_SED_N"     \
+        -e "$VT_SED_P"     \
+        < $spf_file > $rundir/$SPF_OUT
+
+    # Step 2: Patch template netlist — inject SPF path and subcircuit name
+    sed -e "s^.Titan_spf^ $rundir/$SPF_OUT^" \
+        -e "s^.Titan_RO^ $subckt^"            \
+        < $TEMPLATE > $rundir/$NETLIST
+
+    # Step 3: Write a per-cell wrapper that sets the environment and runs HSPICE.
+    # This avoids bsub -env entirely (its syntax rejects colons/@ in values).
+    cat > $rundir/run_hsp.sh << WRAPPER
+#!/bin/ksh
+export PATH=/afs/apd.pok.ibm.com/ant/cad_tools/synopsys/Hspice/T-2022.06-SP2/hspice/hspice/T-2022.06-SP2/hspice/bin:$PATH
+export LM_LICENSE_FILE=$LM_LICENSE_FILE
+$SCRIPTDIR/hsp_2022_new $rundir/$NETLIST
+WRAPPER
+    chmod +x $rundir/run_hsp.sh
+
+    # Submit to LSF — no -w flag, returns immediately
+    bsub -J "${LSF_JOBPREFIX}_${label}" \
+         -M 128 -n 8 -W 4:00 \
+         -R "select[ $LSF_SELECT ]" \
+         -cwd "$rundir" \
+         "ksh $rundir/run_hsp.sh"
+
+    # Record label for ordered results collection later
+    CELL_LABELS="$CELL_LABELS $label"
+}
+
+#-----------------------------------------------------------------------------
+# Helper function: collect_results
+# Runs after all LSF jobs finish — greps each per-cell .lis in submission order
+#-----------------------------------------------------------------------------
+collect_results() {
+    for label in $CELL_LABELS; do
+        rundir="$SCRIPTDIR/run/$label"
+        lisfile="$rundir/${NETLIST}.lis"
+        printf "%s\n" $label >> $RESULTS
+        grep power_supply      $lisfile >> $RESULTS
+        grep temp              $lisfile >> $RESULTS
+        grep iddarail_qcorr=   $lisfile >> $RESULTS
+        grep iddq=             $lisfile >> $RESULTS
+        grep stage_delay=      $lisfile >> $RESULTS
+        grep acceffrail_qcorr= $lisfile >> $RESULTS
+        grep acreffrail_qcorr= $lisfile >> $RESULTS
+    done
+}
+
+#-----------------------------------------------------------------------------
+# Initialise results file and run directory
+#-----------------------------------------------------------------------------
+printf "" > $RESULTS
+mkdir -p $SCRIPTDIR/run
+
+#-----------------------------------------------------------------------------
+# 6TSL cells
+#-----------------------------------------------------------------------------
+run_cell 6TSL_INV   $SPFDIR/PPG1_INV_X2_6TSL.spf         PPG1_INV_X2_6TSL
+run_cell 6TSL_NAND2B $SPFDIR/PPG1_NAND2_X1_B_6TSL.spf    PPG1_NAND2_X1_B_6TSL
+run_cell 6TSL_NOR2B  $SPFDIR/PPG1_NOR2_X1_B_6TSL.spf     PPG1_NOR2_X1_B_6TSL
+run_cell 6TSL_NAND3B $SPFDIR/PPG1_NAND3_X1_B_6TSL.spf    PPG1_NAND3_X1_B_6TSL
+run_cell 6TSL_AOI21  $SPFDIR/PPG1_AOI21_X1_1S0_6TSL.spf  PPG1_AOI21_X1_1S0_6TSL
+run_cell 6TSL_AOI22  $SPFDIR/PPG1_AOI22_X1_S110_6TSL.spf PPG1_AOI22_X1_S110_6TSL
+run_cell 6TSL_OAI21  $SPFDIR/PPG1_OAI21_X1_0S1_6TSL.spf  PPG1_OAI21_X1_0S1_6TSL
+run_cell 6TSL_OAI22  $SPFDIR/PPG1_OAI22_X1_0S11_6TSL.spf PPG1_OAI22_X1_0S11_6TSL
+
+#-----------------------------------------------------------------------------
+# 7TSL cells
+#-----------------------------------------------------------------------------
+run_cell 7TSL_INV    $SPFDIR/PPG1_INV_X2_7TSL.spf         PPG1_INV_X2_7TSL
+run_cell 7TSL_NAND2B $SPFDIR/PPG1_NAND2_X1_B_7TSL.spf    PPG1_NAND2_X1_B_7TSL
+run_cell 7TSL_NOR2B  $SPFDIR/PPG1_NOR2_X1_B_7TSL.spf     PPG1_NOR2_X1_B_7TSL
+run_cell 7TSL_NAND3B $SPFDIR/PPG1_NAND3_X1_B_7TSL.spf    PPG1_NAND3_X1_B_7TSL
+run_cell 7TSL_AOI21  $SPFDIR/PPG1_AOI21_X1_1S0_7TSL.spf  PPG1_AOI21_X1_1S0_7TSL
+run_cell 7TSL_AOI22  $SPFDIR/PPG1_AOI22_X1_S110_7TSL.spf PPG1_AOI22_X1_S110_7TSL
+run_cell 7TSL_OAI21  $SPFDIR/PPG1_OAI21_X1_0S1_7TSL.spf  PPG1_OAI21_X1_0S1_7TSL
+run_cell 7TSL_OAI22  $SPFDIR/PPG1_OAI22_X1_0S11_7TSL.spf PPG1_OAI22_X1_0S11_7TSL
+
+#-----------------------------------------------------------------------------
+# 8TSL cells
+#-----------------------------------------------------------------------------
+run_cell 8TSL_INV    $SPFDIR/PPG1_INV_X2_8TSL.spf         PPG1_INV_X2_8TSL
+run_cell 8TSL_NAND2B $SPFDIR/PPG1_NAND2_X1_B_8TSL.spf    PPG1_NAND2_X1_B_8TSL
+run_cell 8TSL_NOR2B  $SPFDIR/PPG1_NOR2_X1_B_8TSL.spf     PPG1_NOR2_X1_B_8TSL
+run_cell 8TSL_NAND3B $SPFDIR/PPG1_NAND3_X1_B_8TSL.spf    PPG1_NAND3_X1_B_8TSL
+run_cell 8TSL_AOI21  $SPFDIR/PPG1_AOI21_X1_1S0_8TSL.spf  PPG1_AOI21_X1_1S0_8TSL
+run_cell 8TSL_AOI22  $SPFDIR/PPG1_AOI22_X1_S110_8TSL.spf PPG1_AOI22_X1_S110_8TSL
+run_cell 8TSL_OAI21  $SPFDIR/PPG1_OAI21_X1_0S1_8TSL.spf  PPG1_OAI21_X1_0S1_8TSL
+run_cell 8TSL_OAI22  $SPFDIR/PPG1_OAI22_X1_0S11_8TSL.spf PPG1_OAI22_X1_0S11_8TSL
+
+#-----------------------------------------------------------------------------
+# Wait for all LSF jobs to finish (poll bjobs — same pattern as lsfHsp)
+#-----------------------------------------------------------------------------
+echo ""
+echo "All jobs submitted. Waiting for ${LSF_JOBPREFIX}_* to finish..."
+# Brief pause to let LSF register all submitted jobs before first poll
+sleep 15
+while [[ $(bjobs 2>/dev/null | grep -c "${LSF_JOBPREFIX}_") -gt 0 ]]; do
+    echo -n "."
+    sleep 10
+done
+echo ""
+echo "All LSF jobs done. Collecting results..."
+
+#-----------------------------------------------------------------------------
+# Collect results from all per-cell run directories
+#-----------------------------------------------------------------------------
+collect_results
+
+#-----------------------------------------------------------------------------
+# Done
+#-----------------------------------------------------------------------------
+echo ""
+echo "All simulations complete. Results in: $RESULTS"

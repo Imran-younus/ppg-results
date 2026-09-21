@@ -1,0 +1,206 @@
+#!/usr/bin/ksh
+#=============================================================================
+# Script  : PPG_delaychain_menu_VDD_sweep_v0p6SB_ulvt_new
+# Purpose : Run HSPICE delay-chain simulations for all 24 cell types across
+#           14 voltage points (0.50V - 1.15V) in a single parallel LSF burst.
+#           All 336 jobs (14 voltages x 24 cells) are submitted at once and
+#           run in parallel.  Results are collected into PPGRO_chain_menu14.txt
+#           in the same column format as the original sequential script.
+#=============================================================================
+
+#-----------------------------------------------------------------------------
+# Configuration  (shared with PPG_delaychain_menu_sweep_v0p6SB_ulvt_new)
+#-----------------------------------------------------------------------------
+SCRIPTDIR='/afs/apd.pok.ibm.com/u/imranyou/for_imran'
+SPFDIR='/gpfs/projects/t/titan/dtco/usr/sbajaj/SPF_files/tpdk0.6sb'
+BASESP="$SCRIPTDIR/invfo3_base.sp"
+SPF_OUT='PPGchain.spf'
+NETLIST='invfo3_mod.sp'
+RESULTS14="$SCRIPTDIR/PPGRO_chain_menu14.txt"
+
+# LSF resource requirements
+LSF_SELECT='(osver==rh8) && (type == X86_64) && ! etx && ! nojobs'
+LSF_JOBPREFIX='PPGvdd'
+
+# HSPICE binary directory
+HSPICE_BIN='/afs/apd.pok.ibm.com/ant/cad_tools/synopsys/Hspice/T-2022.06-SP2/hspice/hspice/T-2022.06-SP2/hspice/bin'
+
+#-----------------------------------------------------------------------------
+# Voltage sweep points
+#-----------------------------------------------------------------------------
+VOLTAGES='0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1.0 1.05 1.1 1.15'
+
+#-----------------------------------------------------------------------------
+# Cell list: label  spf_file  subckt_name
+#-----------------------------------------------------------------------------
+# sed expressions to normalise SUBCKT port order and swap Vt flavour
+SUBCKT_SED_1='s/\.SUBCKT \([0-9a-zA-Z*_]*\) Z VDD A VSS/.SUBCKT \1 VSS VDD A Z/g'
+SUBCKT_SED_2='s/\.SUBCKT \([0-9a-zA-Z*_]*\) VDD Z A VSS/.SUBCKT \1 VSS VDD A Z/g'
+SUBCKT_SED_3='s/\.SUBCKT \([0-9a-zA-Z*_]*\) A VDD Z VSS/.SUBCKT \1 VSS VDD A Z/g'
+VT_SED_N='s^.slvtnfet^ ulvtnfet^'
+VT_SED_P='s^.slvtpfet^ ulvtpfet^'
+
+#-----------------------------------------------------------------------------
+# Initialise run directory
+#-----------------------------------------------------------------------------
+mkdir -p $SCRIPTDIR/run_vdd
+
+#-----------------------------------------------------------------------------
+# Submit all 336 jobs in parallel
+#-----------------------------------------------------------------------------
+# Track all submitted labels in order for results collection
+ALL_LABELS=''
+
+for vdd in $VOLTAGES; do
+
+    # Patch invfo3_base.sp with this voltage -> per-voltage template
+    vdd_tag=$(echo $vdd | sed 's/\./_/g')   # e.g. 0.55 -> 0_55 (safe dirname)
+    vdd_dir="$SCRIPTDIR/run_vdd/$vdd_tag"
+    mkdir -p $vdd_dir
+    TEMPLATE="$vdd_dir/invfo3_sweep.sp"
+    sed "s|\.param PVDD=[0-9][0-9.]*|.param PVDD=$vdd|" < $BASESP > $TEMPLATE
+
+    for entry in \
+        "6TSL_INV   $SPFDIR/PPG1_INV_X2_6TSL.spf         PPG1_INV_X2_6TSL" \
+        "6TSL_NAND2B $SPFDIR/PPG1_NAND2_X1_B_6TSL.spf    PPG1_NAND2_X1_B_6TSL" \
+        "6TSL_NOR2B  $SPFDIR/PPG1_NOR2_X1_B_6TSL.spf     PPG1_NOR2_X1_B_6TSL" \
+        "6TSL_NAND3B $SPFDIR/PPG1_NAND3_X1_B_6TSL.spf    PPG1_NAND3_X1_B_6TSL" \
+        "6TSL_AOI21  $SPFDIR/PPG1_AOI21_X1_1S0_6TSL.spf  PPG1_AOI21_X1_1S0_6TSL" \
+        "6TSL_AOI22  $SPFDIR/PPG1_AOI22_X1_S110_6TSL.spf PPG1_AOI22_X1_S110_6TSL" \
+        "6TSL_OAI21  $SPFDIR/PPG1_OAI21_X1_0S1_6TSL.spf  PPG1_OAI21_X1_0S1_6TSL" \
+        "6TSL_OAI22  $SPFDIR/PPG1_OAI22_X1_0S11_6TSL.spf PPG1_OAI22_X1_0S11_6TSL" \
+        "7TSL_INV    $SPFDIR/PPG1_INV_X2_7TSL.spf         PPG1_INV_X2_7TSL" \
+        "7TSL_NAND2B $SPFDIR/PPG1_NAND2_X1_B_7TSL.spf    PPG1_NAND2_X1_B_7TSL" \
+        "7TSL_NOR2B  $SPFDIR/PPG1_NOR2_X1_B_7TSL.spf     PPG1_NOR2_X1_B_7TSL" \
+        "7TSL_NAND3B $SPFDIR/PPG1_NAND3_X1_B_7TSL.spf    PPG1_NAND3_X1_B_7TSL" \
+        "7TSL_AOI21  $SPFDIR/PPG1_AOI21_X1_1S0_7TSL.spf  PPG1_AOI21_X1_1S0_7TSL" \
+        "7TSL_AOI22  $SPFDIR/PPG1_AOI22_X1_S110_7TSL.spf PPG1_AOI22_X1_S110_7TSL" \
+        "7TSL_OAI21  $SPFDIR/PPG1_OAI21_X1_0S1_7TSL.spf  PPG1_OAI21_X1_0S1_7TSL" \
+        "7TSL_OAI22  $SPFDIR/PPG1_OAI22_X1_0S11_7TSL.spf PPG1_OAI22_X1_0S11_7TSL" \
+        "8TSL_INV    $SPFDIR/PPG1_INV_X2_8TSL.spf         PPG1_INV_X2_8TSL" \
+        "8TSL_NAND2B $SPFDIR/PPG1_NAND2_X1_B_8TSL.spf    PPG1_NAND2_X1_B_8TSL" \
+        "8TSL_NOR2B  $SPFDIR/PPG1_NOR2_X1_B_8TSL.spf     PPG1_NOR2_X1_B_8TSL" \
+        "8TSL_NAND3B $SPFDIR/PPG1_NAND3_X1_B_8TSL.spf    PPG1_NAND3_X1_B_8TSL" \
+        "8TSL_AOI21  $SPFDIR/PPG1_AOI21_X1_1S0_8TSL.spf  PPG1_AOI21_X1_1S0_8TSL" \
+        "8TSL_AOI22  $SPFDIR/PPG1_AOI22_X1_S110_8TSL.spf PPG1_AOI22_X1_S110_8TSL" \
+        "8TSL_OAI21  $SPFDIR/PPG1_OAI21_X1_0S1_8TSL.spf  PPG1_OAI21_X1_0S1_8TSL" \
+        "8TSL_OAI22  $SPFDIR/PPG1_OAI22_X1_0S11_8TSL.spf PPG1_OAI22_X1_0S11_8TSL"
+    do
+        label=$(echo $entry | awk '{print $1}')
+        spf_file=$(echo $entry | awk '{print $2}')
+        subckt=$(echo $entry | awk '{print $3}')
+
+        rundir="$vdd_dir/$label"
+        mkdir -p $rundir
+
+        # Process SPF
+        sed -e "$SUBCKT_SED_1" \
+            -e "$SUBCKT_SED_2" \
+            -e "$SUBCKT_SED_3" \
+            -e "$VT_SED_N"     \
+            -e "$VT_SED_P"     \
+            < $spf_file > $rundir/$SPF_OUT
+
+        # Patch netlist
+        sed -e "s^.Titan_spf^ $rundir/$SPF_OUT^" \
+            -e "s^.Titan_RO^ $subckt^"            \
+            < $TEMPLATE > $rundir/$NETLIST
+
+        # Write per-job wrapper (sets PATH + LM_LICENSE_FILE for compute node)
+        cat > $rundir/run_hsp.sh << WRAPPER
+#!/bin/ksh
+export PATH=${HSPICE_BIN}:$PATH
+export LM_LICENSE_FILE=$LM_LICENSE_FILE
+$SCRIPTDIR/hsp_2022_new $rundir/$NETLIST
+WRAPPER
+        chmod +x $rundir/run_hsp.sh
+
+        # Submit to LSF — no wait
+        bsub -J "${LSF_JOBPREFIX}_${vdd_tag}_${label}" \
+             -M 128 -n 8 -W 4:00 \
+             -R "select[ $LSF_SELECT ]" \
+             -cwd "$rundir" \
+             "ksh $rundir/run_hsp.sh"
+
+        ALL_LABELS="$ALL_LABELS ${vdd_tag}:${label}"
+    done
+done
+
+#-----------------------------------------------------------------------------
+# Wait for all 336 LSF jobs to finish
+#-----------------------------------------------------------------------------
+echo ""
+echo "All 336 jobs submitted. Waiting for ${LSF_JOBPREFIX}_* to finish..."
+sleep 15
+while [[ $(bjobs 2>/dev/null | grep -c "${LSF_JOBPREFIX}_") -gt 0 ]]; do
+    echo -n "."
+    sleep 10
+done
+echo ""
+echo "All LSF jobs done. Collecting results..."
+
+#-----------------------------------------------------------------------------
+# Collect results — one column per voltage, rows = cells
+# Produces PPGRO_chain_menu14.txt in the same tab-separated column format
+#-----------------------------------------------------------------------------
+CELLS='6TSL_INV 6TSL_NAND2B 6TSL_NOR2B 6TSL_NAND3B 6TSL_AOI21 6TSL_AOI22 6TSL_OAI21 6TSL_OAI22
+       7TSL_INV 7TSL_NAND2B 7TSL_NOR2B 7TSL_NAND3B 7TSL_AOI21 7TSL_AOI22 7TSL_OAI21 7TSL_OAI22
+       8TSL_INV 8TSL_NAND2B 8TSL_NOR2B 8TSL_NAND3B 8TSL_AOI21 8TSL_AOI22 8TSL_OAI21 8TSL_OAI22'
+
+printf "" > $RESULTS14
+
+for label in $CELLS; do
+    # One line per metric per voltage, tab-separated across voltages
+    {
+        printf "%s" "$label"
+        for vdd in $VOLTAGES; do
+            vdd_tag=$(echo $vdd | sed 's/\./_/g')
+            lisfile="$SCRIPTDIR/run_vdd/$vdd_tag/$label/${NETLIST}.lis"
+            sd=$(grep "stage_delay=" $lisfile 2>/dev/null | awk '{print $NF}')
+            printf "\t%s" "${sd:--}"
+        done
+        printf "\n"
+
+        printf "%s_iddq" "$label"
+        for vdd in $VOLTAGES; do
+            vdd_tag=$(echo $vdd | sed 's/\./_/g')
+            lisfile="$SCRIPTDIR/run_vdd/$vdd_tag/$label/${NETLIST}.lis"
+            val=$(grep "iddq=" $lisfile 2>/dev/null | awk '{print $NF}')
+            printf "\t%s" "${val:--}"
+        done
+        printf "\n"
+
+        printf "%s_iddarail" "$label"
+        for vdd in $VOLTAGES; do
+            vdd_tag=$(echo $vdd | sed 's/\./_/g')
+            lisfile="$SCRIPTDIR/run_vdd/$vdd_tag/$label/${NETLIST}.lis"
+            val=$(grep "iddarail_qcorr=" $lisfile 2>/dev/null | awk '{print $NF}')
+            printf "\t%s" "${val:--}"
+        done
+        printf "\n"
+
+        printf "%s_acceff" "$label"
+        for vdd in $VOLTAGES; do
+            vdd_tag=$(echo $vdd | sed 's/\./_/g')
+            lisfile="$SCRIPTDIR/run_vdd/$vdd_tag/$label/${NETLIST}.lis"
+            val=$(grep "acceffrail_qcorr=" $lisfile 2>/dev/null | awk '{print $NF}')
+            printf "\t%s" "${val:--}"
+        done
+        printf "\n"
+
+        printf "%s_acreff" "$label"
+        for vdd in $VOLTAGES; do
+            vdd_tag=$(echo $vdd | sed 's/\./_/g')
+            lisfile="$SCRIPTDIR/run_vdd/$vdd_tag/$label/${NETLIST}.lis"
+            val=$(grep "acreffrail_qcorr=" $lisfile 2>/dev/null | awk '{print $NF}')
+            printf "\t%s" "${val:--}"
+        done
+        printf "\n"
+    } >> $RESULTS14
+done
+
+#-----------------------------------------------------------------------------
+# Done
+#-----------------------------------------------------------------------------
+echo ""
+echo "All simulations complete. Results in: $RESULTS14"

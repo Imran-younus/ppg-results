@@ -1,0 +1,216 @@
+6TSL_INV
+ power_supply=   1.15000
+ ****** transient analysis tnom=  25.000 temp=  25.000 ******
+ ****** job statistics summary tnom=  25.000 temp=  25.000 ******
+ iddarail_qcorr= 1.27448e-03
+ iddq= 1.14386e-07
+ stage_delay=   5.28221
+ acceffrail_qcorr= 5.85512e-15
+ acreffrail_qcorr= 9.02151e+02
+6TSL_NAND2B
+ power_supply=   1.15000
+ ****** transient analysis tnom=  25.000 temp=  25.000 ******
+ ****** job statistics summary tnom=  25.000 temp=  25.000 ******
+ iddarail_qcorr= 6.82239e-04
+ iddq= 6.91780e-08
+ stage_delay=   8.18783
+ acceffrail_qcorr= 4.85851e-15
+ acreffrail_qcorr= 1.68525e+03
+6TSL_NOR2B
+ power_supply=   1.15000
+ ****** transient analysis tnom=  25.000 temp=  25.000 ******
+ ****** job statistics summary tnom=  25.000 temp=  25.000 ******
+ iddarail_qcorr= 6.51630e-04
+ iddq= 1.02962e-07
+ stage_delay=   8.82052
+ acceffrail_qcorr= 4.99976e-15
+ acreffrail_qcorr= 1.76419e+03
+6TSL_NAND3B
+ power_supply=   1.15000
+ ****** transient analysis tnom=  25.000 temp=  25.000 ******
+ ****** job statistics summary tnom=  25.000 temp=  25.000 ******
+ iddarail_qcorr= 6.42739e-04
+ iddq= 7.84706e-08
+ stage_delay= 1.00346e+01
+ acceffrail_qcorr= 5.60985e-15
+ acreffrail_qcorr= 1.78874e+03
+6TSL_AOI21
+ power_supply=   1.15000
+ ****** transient analysis tnom=  25.000 temp=  25.000 ******
+ ****** job statistics summary tnom=  25.000 temp=  25.000 ******
+ iddarail_qcorr= 5.67433e-04
+ iddq= 1.11344e-07
+ stage_delay= 1.08646e+01
+ acceffrail_qcorr= 5.36315e-15
+ acreffrail_qcorr= 2.02579e+03
+6TSL_AOI22
+ power_supply=   1.15000
+ ****** transient analysis tnom=  25.000 temp=  25.000 ******
+ ****** job statistics summary tnom=  25.000 temp=  25.000 ******
+ iddarail_qcorr= 5.38896e-04
+ iddq= 1.14131e-07
+ stage_delay= 1.21157e+01
+ acceffrail_qcorr= 5.68011e-15
+ acreffrail_qcorr= 2.13300e+03
+6TSL_OAI21
+ power_supply=   1.15000
+ ****** transient analysis tnom=  25.000 temp=  25.000 ******
+ ****** job statistics summary tnom=  25.000 temp=  25.000 ******
+ iddarail_qcorr= 5.63677e-04
+ iddq= 1.11788e-07
+ stage_delay= 1.09327e+01
+ acceffrail_qcorr= 5.36105e-15
+ acreffrail_qcorr= 2.03929e+03
+6TSL_OAI22
+ power_supply=   1.15000
+ ****** transient analysis tnom=  25.000 temp=  25.000 ******
+ ****** job statistics summary tnom=  25.000 temp=  25.000 ******
+ iddarail_qcorr= 5.86706e-04
+ iddq= 1.05260e-07
+ stage_delay= 1.14156e+01
+ acceffrail_qcorr= 5.82630e-15
+ acreffrail_qcorr= 1.95932e+03
+7TSL_INV
+ power_supply=   1.15000
+ ****** transient analysis tnom=  25.000 temp=  25.000 ******
+ ****** job statistics summary tnom=  25.000 temp=  25.000 ******
+ iddarail_qcorr= 1.89035e-03
+ iddq= 2.42018e-07
+ stage_delay=   4.77143
+ acceffrail_qcorr= 7.84539e-15
+ acreffrail_qcorr= 6.08183e+02
+7TSL_NAND2B
+ power_supply=   1.15000
+ ****** transient analysis tnom=  25.000 temp=  25.000 ******
+ ****** job statistics summary tnom=  25.000 temp=  25.000 ******
+ iddarail_qcorr= 1.04751e-03
+ iddq= 1.44174e-07
+ stage_delay=   6.77728
+ acceffrail_qcorr= 6.17516e-15
+ acreffrail_qcorr= 1.09751e+03
+7TSL_NOR2B
+ power_supply=   1.15000
+ ****** transient analysis tnom=  25.000 temp=  25.000 ******
+ ****** job statistics summary tnom=  25.000 temp=  25.000 ******
+ iddarail_qcorr= 1.00120e-03
+ iddq= 2.17382e-07
+ stage_delay=   7.30372
+ acceffrail_qcorr= 6.36175e-15
+ acreffrail_qcorr= 1.14807e+03
+7TSL_NAND3B
+ power_supply=   1.15000
+ ****** transient analysis tnom=  25.000 temp=  25.000 ******
+ ****** job statistics summary tnom=  25.000 temp=  25.000 ******
+ iddarail_qcorr= 9.85921e-04
+ iddq= 1.63103e-07
+ stage_delay=   8.29788
+ acceffrail_qcorr= 7.11652e-15
+ acreffrail_qcorr= 1.16600e+03
+7TSL_AOI21
+ power_supply=   1.15000
+ ****** transient analysis tnom=  25.000 temp=  25.000 ******
+ ****** job statistics summary tnom=  25.000 temp=  25.000 ******
+ iddarail_qcorr= 8.75646e-04
+ iddq= 2.33624e-07
+ stage_delay=   9.00629
+ acceffrail_qcorr= 6.86170e-15
+ acreffrail_qcorr= 1.31254e+03
+7TSL_AOI22
+ power_supply=   1.15000
+ ****** transient analysis tnom=  25.000 temp=  25.000 ******
+ ****** job statistics summary tnom=  25.000 temp=  25.000 ******
+ iddarail_qcorr= 8.29562e-04
+ iddq= 2.38576e-07
+ stage_delay= 1.00202e+01
+ acceffrail_qcorr= 7.23275e-15
+ acreffrail_qcorr= 1.38540e+03
+7TSL_OAI21
+ power_supply=   1.15000
+ ****** transient analysis tnom=  25.000 temp=  25.000 ******
+ ****** job statistics summary tnom=  25.000 temp=  25.000 ******
+ iddarail_qcorr= 8.65463e-04
+ iddq= 2.33080e-07
+ stage_delay=   9.13659
+ acceffrail_qcorr= 6.88006e-15
+ acreffrail_qcorr= 1.32798e+03
+7TSL_OAI22
+ power_supply=   1.15000
+ ****** transient analysis tnom=  25.000 temp=  25.000 ******
+ ****** job statistics summary tnom=  25.000 temp=  25.000 ******
+ iddarail_qcorr= 9.02293e-04
+ iddq= 2.19214e-07
+ stage_delay=   9.53647
+ acceffrail_qcorr= 7.48635e-15
+ acreffrail_qcorr= 1.27385e+03
+8TSL_INV
+ power_supply=   1.15000
+ ****** transient analysis tnom=  25.000 temp=  25.000 ******
+ ****** job statistics summary tnom=  25.000 temp=  25.000 ******
+ iddarail_qcorr= 2.45254e-03
+ iddq= 3.58080e-07
+ stage_delay=   4.65930
+ acceffrail_qcorr= 9.93980e-15
+ acreffrail_qcorr= 4.68752e+02
+8TSL_NAND2B
+ power_supply=   1.15000
+ ****** transient analysis tnom=  25.000 temp=  25.000 ******
+ ****** job statistics summary tnom=  25.000 temp=  25.000 ******
+ iddarail_qcorr= 1.39203e-03
+ iddq= 2.14018e-07
+ stage_delay=   6.25060
+ acceffrail_qcorr= 7.56867e-15
+ acreffrail_qcorr= 8.25852e+02
+8TSL_NOR2B
+ power_supply=   1.15000
+ ****** transient analysis tnom=  25.000 temp=  25.000 ******
+ ****** job statistics summary tnom=  25.000 temp=  25.000 ******
+ iddarail_qcorr= 1.33337e-03
+ iddq= 3.20011e-07
+ stage_delay=   6.69649
+ acceffrail_qcorr= 7.76838e-15
+ acreffrail_qcorr= 8.62018e+02
+8TSL_NAND3B
+ power_supply=   1.15000
+ ****** transient analysis tnom=  25.000 temp=  25.000 ******
+ ****** job statistics summary tnom=  25.000 temp=  25.000 ******
+ iddarail_qcorr= 1.31165e-03
+ iddq= 2.42883e-07
+ stage_delay=   7.57740
+ acceffrail_qcorr= 8.64599e-15
+ acreffrail_qcorr= 8.76406e+02
+8TSL_AOI21
+ power_supply=   1.15000
+ ****** transient analysis tnom=  25.000 temp=  25.000 ******
+ ****** job statistics summary tnom=  25.000 temp=  25.000 ******
+ iddarail_qcorr= 1.17101e-03
+ iddq= 3.44635e-07
+ stage_delay=   8.24144
+ acceffrail_qcorr= 8.39744e-15
+ acreffrail_qcorr= 9.81423e+02
+8TSL_AOI22
+ power_supply=   1.15000
+ ****** transient analysis tnom=  25.000 temp=  25.000 ******
+ ****** job statistics summary tnom=  25.000 temp=  25.000 ******
+ iddarail_qcorr= 1.10931e-03
+ iddq= 3.51508e-07
+ stage_delay=   9.14800
+ acceffrail_qcorr= 8.83049e-15
+ acreffrail_qcorr= 1.03596e+03
+8TSL_OAI21
+ power_supply=   1.15000
+ ****** transient analysis tnom=  25.000 temp=  25.000 ******
+ ****** job statistics summary tnom=  25.000 temp=  25.000 ******
+ iddarail_qcorr= 1.15266e-03
+ iddq= 3.43736e-07
+ stage_delay=   8.42206
+ acceffrail_qcorr= 8.44712e-15
+ acreffrail_qcorr= 9.97034e+02
+8TSL_OAI22
+ power_supply=   1.15000
+ ****** transient analysis tnom=  25.000 temp=  25.000 ******
+ ****** job statistics summary tnom=  25.000 temp=  25.000 ******
+ iddarail_qcorr= 1.20008e-03
+ iddq= 3.21987e-07
+ stage_delay=   8.77869
+ acceffrail_qcorr= 9.16640e-15
+ acreffrail_qcorr= 9.57703e+02

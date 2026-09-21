@@ -1,0 +1,61 @@
+#!/usr/bin/ksh
+#-------------------------------------------------------------------------
+# Purpose: Run a list of hspice circuit
+# Author : George Gallant
+#-------------------------------------------------------------------------
+export META_QUEUE=1
+old_license=$LM_LICENSE_FILE
+# Use the environment's current LM_LICENSE_FILE (stale hardcoded paths removed)
+# Active servers: 5280@cdsserv1.pok.ibm.com,5280@cdsserv2.pok.ibm.com
+#                 1716@rchlic1.rchland.ibm.com,1716@rchlic2.rchland.ibm.com
+#                 5280@hdlic10.boeblingen.de.ibm.com,5280@hdlic11.boeblingen.de.ibm.com
+export LM_LICENSE_FILE
+export SNPSLMD_DAEMON=OFF
+
+#hspexec='hspice'
+#hspexec='hspice'
+#hspexec='hspice'
+#hspexec='hspice'
+#hspexec='hspice' Kelvin Lewis path change
+# hspexec='hspice'
+# hspexec='hspice'
+  hspexec='hspice'
+#  hspexec='hspice'
+
+os_name=`uname -s`
+
+#topdir='/afs/apd.pok.ibm.com/ant/research/perf_tune/7lp/scripts_v1'
+topdir='/afs/apd.pok.ibm.com/u/imranyou/for_imran'
+
+
+for file_name
+do
+  out="$file_name.lis"
+  echo
+  echo "Hspice simulation"
+  echo "INPUT: $file_name" 
+  echo "LIS:   $out"
+  echo "PWD:   $PWD"
+  echo "EXE:   $hspexec" 
+  echo
+  echo "START:" `date`
+
+  $hspexec -i $file_name -dp > $out
+
+  echo "DONE: " `date`
+  echo
+
+done
+export LM_LICENSE_FILE=$old_license
+
+# clean up .ic0 .st0 .mt0 .dp0 .pa0
+     $topdir/clean_hsp_files $file_name ic
+     $topdir/clean_hsp_files $file_name st 
+     $topdir/clean_hsp_files $file_name mt 
+     $topdir/clean_hsp_files $file_name ms 
+     $topdir/clean_hsp_files $file_name sw
+     $topdir/clean_hsp_files $file_name dp 
+     $topdir/clean_hsp_files $file_name pa 
+     $topdir/clean_hsp_files $file_name valog 
+     $topdir/clean_hsp_files $file_name pvadir
+##
