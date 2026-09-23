@@ -80,16 +80,28 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
 
 <header>
   <h1>PPG Delay Chain — Simulation Results</h1>
-  <p>HSPICE T-2022.06-SP2 &nbsp;·&nbsp; Technology v0.6SB ULVT &nbsp;·&nbsp; TT Corner &nbsp;·&nbsp; T = 25 °C</p>
-  <div class="badges">
-    <span class="badge">336 simulations</span>
-    <span class="badge">24 cells</span>
-    <span class="badge">6TSL / 7TSL / 8TSL</span>
-    <span class="badge">VDD 0.5 V – 1.15 V (14 pts)</span>
-    <span class="badge">5 metrics per cell</span>
+  <p>HSPICE T-2022.06-SP2 &nbsp;·&nbsp; Technology v0.6SB &nbsp;·&nbsp; TT Corner &nbsp;·&nbsp; T = 25 °C</p>
+  <div style="display:flex;align-items:center;gap:14px;margin-top:12px;flex-wrap:wrap;">
+    <div class="badges" id="header-badges">
+      <span class="badge">336 simulations</span>
+      <span class="badge">24 cells</span>
+      <span class="badge">6TSL / 7TSL / 8TSL</span>
+      <span class="badge">VDD 0.5 V – 1.15 V (14 pts)</span>
+      <span class="badge">5 metrics per cell</span>
+    </div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+      <label style="font-size:12px;color:var(--muted);white-space:nowrap;">Dataset:</label>
+      <select id="dataset-select" onchange="switchDataset(this.value)"
+        style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;">
+        <option value="single">Single INV — VDD Sweep (24 cells, 6/7/8TSL)</option>
+        <option value="chain">101-Stage Chain — Single Point (7TSL SLVT, VDD=0.70V)</option>
+      </select>
+    </div>
   </div>
 </header>
 
+<!-- ═══ SINGLE INV VIEW ═══ -->
+<div id="view-single">
 <div class="kpis" id="kpis"></div>
 
 <!-- SECTION 1 -->
@@ -204,7 +216,59 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
   <div class="obs-grid" id="obs-grid"></div>
 </section>
 
-<footer>PPG Delay Chain Simulation Results &nbsp;·&nbsp; v0.6SB ULVT &nbsp;·&nbsp; Made with IBM Bob</footer>
+</div><!-- end #view-single -->
+
+<!-- ═══ 101-STAGE CHAIN VIEW ═══ -->
+<div id="view-chain" style="display:none">
+
+<section>
+  <div class="section-title"><span class="bar"></span>101-Stage Chain — Simulation Results</div>
+  <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">VDD = 0.70 V &nbsp;·&nbsp; T = 25 °C &nbsp;·&nbsp; TT Corner &nbsp;·&nbsp; 101 stages &nbsp;·&nbsp; v0.6SB2 model</p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Cell</th>
+          <th>Stage Delay (ps)</th>
+          <th>Ceff (fF)</th>
+          <th>ACReff (KΩ)</th>
+          <th>IDDQ/stage (nA)</th>
+        </tr>
+      </thead>
+      <tbody id="chain-tbody"></tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="section-title"><span class="bar"></span>Metric Comparison — 7TSL SLVT Cells</div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">Stage Delay (ps)</div>
+      <div class="chart-sub">101-stage chain · VDD = 0.70V · 25°C</div>
+      <canvas id="chain-delay" height="220"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Ceff (fF)</div>
+      <div class="chart-sub">Effective switching capacitance per stage</div>
+      <canvas id="chain-ceff" height="220"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">ACReff (KΩ)</div>
+      <div class="chart-sub">AC resistance — ring oscillator efficiency</div>
+      <canvas id="chain-acreff" height="220"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">IDDQ/stage (nA)</div>
+      <div class="chart-sub">Static current per stage</div>
+      <canvas id="chain-iddq" height="220"></canvas>
+    </div>
+  </div>
+</section>
+
+</div><!-- end #view-chain -->
+
+<footer>PPG Delay Chain Simulation Results &nbsp;·&nbsp; v0.6SB &nbsp;·&nbsp; Made with IBM Bob</footer>
 </div>
 <script>
 // ═══════════════════════════════════════════════════════════════════
@@ -946,6 +1010,103 @@ function renderAll(){
   buildScatter3();
   buildAccChart();
   buildObs();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 101-STAGE CHAIN DATA & VIEW
+// ═══════════════════════════════════════════════════════════════════
+const CHAIN_CELLS=[
+  {label:'7TSL_INVX2', stage_delay:6.88577, ceff:5.45788, acreff:1.26162, iddq:12.61346},
+  {label:'7TSL_NAND2B',stage_delay:10.70516,ceff:4.85153, acreff:2.20655, iddq:9.03332},
+  {label:'7TSL_NAND2T',stage_delay:10.21789,ceff:4.60155, acreff:2.22053, iddq:9.18992},
+  {label:'7TSL_NAND3B',stage_delay:13.32600,ceff:5.46193, acreff:2.43980, iddq:11.04141},
+  {label:'7TSL_NAND3T',stage_delay:12.77663,ceff:5.04378, acreff:2.53315, iddq:11.28430},
+  {label:'7TSL_NOR2B', stage_delay:11.69318,ceff:4.90393, acreff:2.38445, iddq:9.90899},
+  {label:'7TSL_NOR2T', stage_delay:10.97145,ceff:4.60546, acreff:2.38227, iddq:10.02576}
+];
+
+const CHAIN_COLORS=['#00d4ff','#00ff9f','#ffe93e','#ff6b35','#ff2d78','#bd00ff','#3ee8ff'];
+
+let chainChartsBuilt=false;
+
+function buildChainView(){
+  // Table
+  const tbody=document.getElementById('chain-tbody');
+  const maxSD=Math.max(...CHAIN_CELLS.map(c=>c.stage_delay));
+  tbody.innerHTML=CHAIN_CELLS.map((c,i)=>`
+    <tr>
+      <td><span class="chip chip7">${c.label}</span></td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="mono">${c.stage_delay.toFixed(3)}</span>
+          <div class="bar-track"><div class="bar-fill" style="width:${(c.stage_delay/maxSD*100).toFixed(1)}%;background:${CHAIN_COLORS[i]}"></div></div>
+        </div>
+      </td>
+      <td class="mono">${c.ceff.toFixed(3)}</td>
+      <td class="mono">${c.acreff.toFixed(3)}</td>
+      <td class="mono">${c.iddq.toFixed(3)}</td>
+    </tr>`).join('');
+
+  if(chainChartsBuilt) return;
+  chainChartsBuilt=true;
+
+  const labels=CHAIN_CELLS.map(c=>c.label);
+  const colors=CHAIN_COLORS;
+  const barOpts=(yLabel)=>({
+    responsive:true,animation:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:i=>i.dataset.label+': '+i.raw}}},
+    scales:{
+      x:{ticks:{color:'#7a85a0',font:{size:10},maxRotation:45},grid:{color:'#1c2030'}},
+      y:{ticks:{color:'#7a85a0',font:{size:10}},grid:{color:'#1c2030'},
+         title:{display:true,text:yLabel,color:'#7a85a0',font:{size:10}}}
+    }
+  });
+
+  new Chart(document.getElementById('chain-delay'),{type:'bar',
+    data:{labels,datasets:[{label:'Stage Delay (ps)',data:CHAIN_CELLS.map(c=>c.stage_delay),
+      backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:4}]},
+    options:barOpts('Stage Delay (ps)')});
+
+  new Chart(document.getElementById('chain-ceff'),{type:'bar',
+    data:{labels,datasets:[{label:'Ceff (fF)',data:CHAIN_CELLS.map(c=>c.ceff),
+      backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:4}]},
+    options:barOpts('Ceff (fF)')});
+
+  new Chart(document.getElementById('chain-acreff'),{type:'bar',
+    data:{labels,datasets:[{label:'ACReff (KΩ)',data:CHAIN_CELLS.map(c=>c.acreff),
+      backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:4}]},
+    options:barOpts('ACReff (KΩ)')});
+
+  new Chart(document.getElementById('chain-iddq'),{type:'bar',
+    data:{labels,datasets:[{label:'IDDQ/stage (nA)',data:CHAIN_CELLS.map(c=>c.iddq),
+      backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:4}]},
+    options:barOpts('IDDQ/stage (nA)')});
+}
+
+function switchDataset(val){
+  const single=document.getElementById('view-single');
+  const chain=document.getElementById('view-chain');
+  const badges=document.getElementById('header-badges');
+  if(val==='chain'){
+    single.style.display='none';
+    chain.style.display='';
+    badges.innerHTML=`
+      <span class="badge">7 cells</span>
+      <span class="badge">7TSL SLVT</span>
+      <span class="badge">101-stage chain</span>
+      <span class="badge">VDD = 0.70 V</span>
+      <span class="badge">4 metrics</span>`;
+    buildChainView();
+  } else {
+    chain.style.display='none';
+    single.style.display='';
+    badges.innerHTML=`
+      <span class="badge">336 simulations</span>
+      <span class="badge">24 cells</span>
+      <span class="badge">6TSL / 7TSL / 8TSL</span>
+      <span class="badge">VDD 0.5 V – 1.15 V (14 pts)</span>
+      <span class="badge">5 metrics per cell</span>`;
+  }
 }
 
 // Boot
