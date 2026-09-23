@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PPG Delay Chain — Simulation Results v0.6SB ULVT</title>
+<title id="page-title">PPG Delay Chain — Simulation Results</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 :root {
@@ -80,15 +80,9 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
 
 <header>
   <h1>PPG Delay Chain — Simulation Results</h1>
-  <p>HSPICE T-2022.06-SP2 &nbsp;·&nbsp; Technology v0.6SB &nbsp;·&nbsp; TT Corner &nbsp;·&nbsp; T = 25 °C</p>
+  <p id="header-subtitle"></p>
   <div style="display:flex;align-items:center;gap:14px;margin-top:12px;flex-wrap:wrap;">
-    <div class="badges" id="header-badges">
-      <span class="badge">336 simulations</span>
-      <span class="badge">24 cells</span>
-      <span class="badge">6TSL / 7TSL / 8TSL</span>
-      <span class="badge">VDD 0.5 V – 1.15 V (14 pts)</span>
-      <span class="badge">5 metrics per cell</span>
-    </div>
+    <div class="badges" id="header-badges"></div>
     <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
       <label style="font-size:12px;color:var(--muted);white-space:nowrap;">Dataset:</label>
       <select id="dataset-select" onchange="switchDataset(this.value)"
@@ -223,7 +217,7 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
 
 <section>
   <div class="section-title"><span class="bar"></span>101-Stage Chain — Simulation Results</div>
-  <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">VDD = 0.70 V &nbsp;·&nbsp; T = 25 °C &nbsp;·&nbsp; TT Corner &nbsp;·&nbsp; 101 stages &nbsp;·&nbsp; v0.6SB2 model</p>
+  <p style="font-size:12px;color:var(--muted);margin-bottom:14px;" id="chain-conditions"></p>
   <div class="table-wrap">
     <table>
       <thead>
@@ -245,22 +239,22 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
   <div class="charts-grid">
     <div class="chart-card">
       <div class="chart-title">Stage Delay (ps)</div>
-      <div class="chart-sub">101-stage chain · VDD = 0.70V · 25°C</div>
+      <div class="chart-sub" id="chain-sub-delay"></div>
       <canvas id="chain-delay" height="220"></canvas>
     </div>
     <div class="chart-card">
       <div class="chart-title">Ceff (fF)</div>
-      <div class="chart-sub">Effective switching capacitance per stage</div>
+      <div class="chart-sub" id="chain-sub-ceff"></div>
       <canvas id="chain-ceff" height="220"></canvas>
     </div>
     <div class="chart-card">
       <div class="chart-title">ACReff (KΩ)</div>
-      <div class="chart-sub">AC resistance — ring oscillator efficiency</div>
+      <div class="chart-sub" id="chain-sub-acreff"></div>
       <canvas id="chain-acreff" height="220"></canvas>
     </div>
     <div class="chart-card">
       <div class="chart-title">IDDQ/stage (nA)</div>
-      <div class="chart-sub">Static current per stage</div>
+      <div class="chart-sub" id="chain-sub-iddq"></div>
       <canvas id="chain-iddq" height="220"></canvas>
     </div>
   </div>
@@ -268,7 +262,7 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
 
 </div><!-- end #view-chain -->
 
-<footer>PPG Delay Chain Simulation Results &nbsp;·&nbsp; v0.6SB &nbsp;·&nbsp; Made with IBM Bob</footer>
+<footer id="page-footer">PPG Delay Chain Simulation Results &nbsp;·&nbsp; Made with IBM Bob</footer>
 </div>
 <script>
 // ═══════════════════════════════════════════════════════════════════
@@ -1013,7 +1007,50 @@ function renderAll(){
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// 101-STAGE CHAIN DATA & VIEW
+// SIMULATION METADATA — single source of truth for both datasets.
+// Update these objects when technology, model, VDD, temp or corner
+// changes. Every title, badge, subtitle and label derives from here.
+// ═══════════════════════════════════════════════════════════════════
+
+// Single INV VDD sweep dataset
+const SINGLE_META={
+  technology:  'v0.6SB',
+  simulator:   'HSPICE T-2022.06-SP2',
+  vdd_range:   '0.5 V – 1.15 V',
+  vdd_pts:     14,
+  temp:        '25 °C',
+  corner:      'TT',
+  tsl_flavors: '6TSL / 7TSL / 8TSL',
+  vt_flavor:   'ULVT',
+  n_cells:     24,
+  n_sims:      336,
+  n_metrics:   5,
+};
+
+// 101-stage chain dataset
+const CHAIN_META={
+  technology:  'v0.6SB2',
+  simulator:   'HSPICE T-2022.06-SP2',
+  vdd:         '0.70 V',
+  temp:        '25 °C',
+  corner:      'TT',
+  stages:      101,
+  vt_flavor:   '7TSL SLVT',
+  n_metrics:   4,
+};
+
+// Derived condition strings
+function singleCondStr(){
+  const m=SINGLE_META;
+  return `${m.simulator} \u00b7 Technology ${m.technology} ${m.vt_flavor} \u00b7 ${m.corner} Corner \u00b7 T\u202f=\u202f${m.temp}`;
+}
+function chainCondStr(){
+  const m=CHAIN_META;
+  return `VDD\u202f=\u202f${m.vdd} \u00b7 T\u202f=\u202f${m.temp} \u00b7 ${m.corner} Corner \u00b7 ${m.stages} stages \u00b7 ${m.technology} model \u00b7 ${m.vt_flavor}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 101-STAGE CHAIN — SIMULATION DATA
 // ═══════════════════════════════════════════════════════════════════
 const CHAIN_CELLS=[
   {label:'7TSL_INVX2', stage_delay:6.88577, ceff:5.45788, acreff:1.26162, iddq:12.61346},
@@ -1030,6 +1067,17 @@ const CHAIN_COLORS=['#00d4ff','#00ff9f','#ffe93e','#ff6b35','#ff2d78','#bd00ff',
 let chainChartsBuilt=false;
 
 function buildChainView(){
+  const m=CHAIN_META;
+  // Populate all condition-derived labels from CHAIN_META
+  document.getElementById('chain-conditions').textContent=chainCondStr();
+  document.getElementById('chain-sub-delay').textContent=
+    `${m.stages}-stage chain \u00b7 VDD\u202f=\u202f${m.vdd} \u00b7 T\u202f=\u202f${m.temp} \u00b7 ${m.corner} \u00b7 ${m.technology}`;
+  document.getElementById('chain-sub-ceff').textContent=
+    `Effective switching capacitance per stage \u00b7 ${m.vt_flavor} \u00b7 ${m.technology}`;
+  document.getElementById('chain-sub-acreff').textContent=
+    `AC resistance \u2014 RO efficiency \u00b7 ${m.vt_flavor} \u00b7 VDD\u202f=\u202f${m.vdd} \u00b7 ${m.technology}`;
+  document.getElementById('chain-sub-iddq').textContent=
+    `Static current per stage \u00b7 ${m.vt_flavor} \u00b7 VDD\u202f=\u202f${m.vdd} \u00b7 ${m.corner} \u00b7 ${m.technology}`;
   // Table
   const tbody=document.getElementById('chain-tbody');
   const maxSD=Math.max(...CHAIN_CELLS.map(c=>c.stage_delay));
@@ -1086,31 +1134,48 @@ function buildChainView(){
 function switchDataset(val){
   const single=document.getElementById('view-single');
   const chain=document.getElementById('view-chain');
-  const badges=document.getElementById('header-badges');
   if(val==='chain'){
     single.style.display='none';
     chain.style.display='';
-    badges.innerHTML=`
-      <span class="badge">7 cells</span>
-      <span class="badge">7TSL SLVT</span>
-      <span class="badge">101-stage chain</span>
-      <span class="badge">VDD = 0.70 V</span>
-      <span class="badge">4 metrics</span>`;
+    const m=CHAIN_META;
+    document.getElementById('header-subtitle').textContent=
+      `${m.simulator} \u00b7 ${m.technology} \u00b7 ${m.corner} Corner \u00b7 T\u202f=\u202f${m.temp}`;
+    document.getElementById('header-badges').innerHTML=`
+      <span class="badge">${CHAIN_CELLS.length} cells</span>
+      <span class="badge">${m.vt_flavor}</span>
+      <span class="badge">${m.stages}-stage chain</span>
+      <span class="badge">VDD\u202f=\u202f${m.vdd}</span>
+      <span class="badge">T\u202f=\u202f${m.temp} \u00b7 ${m.corner}</span>
+      <span class="badge">${m.technology}</span>`;
     buildChainView();
   } else {
     chain.style.display='none';
     single.style.display='';
-    badges.innerHTML=`
-      <span class="badge">336 simulations</span>
-      <span class="badge">24 cells</span>
-      <span class="badge">6TSL / 7TSL / 8TSL</span>
-      <span class="badge">VDD 0.5 V – 1.15 V (14 pts)</span>
-      <span class="badge">5 metrics per cell</span>`;
+    const m=SINGLE_META;
+    document.getElementById('header-subtitle').textContent=singleCondStr();
+    document.getElementById('header-badges').innerHTML=`
+      <span class="badge">${m.n_sims} simulations</span>
+      <span class="badge">${m.n_cells} cells</span>
+      <span class="badge">${m.tsl_flavors}</span>
+      <span class="badge">VDD ${m.vdd_range} (${m.vdd_pts} pts)</span>
+      <span class="badge">${m.n_metrics} metrics per cell</span>`;
   }
 }
 
-// Boot
+// Boot — initialise metadata-driven labels before first render
 Chart.defaults.color='#7a85a0';
+(function initLabels(){
+  const m=SINGLE_META;
+  document.getElementById('header-subtitle').textContent=singleCondStr();
+  document.getElementById('header-badges').innerHTML=`
+    <span class="badge">${m.n_sims} simulations</span>
+    <span class="badge">${m.n_cells} cells</span>
+    <span class="badge">${m.tsl_flavors}</span>
+    <span class="badge">VDD ${m.vdd_range} (${m.vdd_pts} pts)</span>
+    <span class="badge">${m.n_metrics} metrics per cell</span>`;
+  document.getElementById('page-title').textContent=
+    `PPG Delay Chain \u2014 ${m.technology} ${m.vt_flavor} Results`;
+})();
 buildVddPills();
 renderAll();
 </script>
