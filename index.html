@@ -89,6 +89,7 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
         style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;">
         <option value="single">Single INV — VDD Sweep (24 cells, 6/7/8TSL)</option>
         <option value="chain">101-Stage Chain — Single Point (7TSL SLVT, VDD=0.70V)</option>
+        <option value="chain_norm">101-Stage Chain — Normalized to 1 Invertor (÷101)</option>
       </select>
     </div>
   </div>
@@ -261,6 +262,57 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
 </section>
 
 </div><!-- end #view-chain -->
+
+<!-- ═══ 101-STAGE CHAIN — NORMALIZED VIEW ═══ -->
+<div id="view-chain-norm" style="display:none">
+
+<section>
+  <div class="section-title"><span class="bar"></span>101-Stage Chain — Normalized to Single Invertor (÷101)</div>
+  <p style="font-size:12px;color:var(--muted);margin-bottom:14px;" id="chain-norm-conditions"></p>
+  <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">Each value = raw 101-stage measurement ÷ <strong style="color:var(--accent)" id="chain-norm-divisor"></strong>. Automatically tracks the chain length defined in <code>CHAIN_META.stages</code>.</p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Cell</th>
+          <th>Stage Delay (ps)</th>
+          <th>Ceff (fF)</th>
+          <th>ACReff (KΩ)</th>
+          <th>IDDQ/stage (nA)</th>
+        </tr>
+      </thead>
+      <tbody id="chain-norm-tbody"></tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="section-title"><span class="bar"></span>Metric Comparison — Normalized per Invertor</div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">Stage Delay (ps)</div>
+      <div class="chart-sub" id="chain-norm-sub-delay"></div>
+      <canvas id="chain-norm-delay" height="220"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Ceff (fF)</div>
+      <div class="chart-sub" id="chain-norm-sub-ceff"></div>
+      <canvas id="chain-norm-ceff" height="220"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">ACReff (KΩ)</div>
+      <div class="chart-sub" id="chain-norm-sub-acreff"></div>
+      <canvas id="chain-norm-acreff" height="220"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">IDDQ/stage (nA)</div>
+      <div class="chart-sub" id="chain-norm-sub-iddq"></div>
+      <canvas id="chain-norm-iddq" height="220"></canvas>
+    </div>
+  </div>
+</section>
+
+</div><!-- end #view-chain-norm -->
 
 <footer id="page-footer">PPG Delay Chain Simulation Results &nbsp;·&nbsp; Made with IBM Bob</footer>
 </div>
@@ -1065,6 +1117,7 @@ const CHAIN_CELLS=[
 const CHAIN_COLORS=['#00d4ff','#00ff9f','#ffe93e','#ff6b35','#ff2d78','#bd00ff','#3ee8ff'];
 
 let chainChartsBuilt=false;
+let chainNormChartsBuilt=false;
 
 function buildChainView(){
   const m=CHAIN_META;
@@ -1131,25 +1184,111 @@ function buildChainView(){
     options:barOpts('IDDQ/stage (nA)')});
 }
 
+// Normalize a single CHAIN_CELLS row by dividing each metric by CHAIN_META.stages.
+// This function is the single source of truth — adding new metrics to CHAIN_CELLS
+// records only requires updating the table/chart builders below; the division is
+// always applied here automatically.
+function normChainCell(c){
+  const n=CHAIN_META.stages;
+  return {label:c.label, stage_delay:c.stage_delay/n, ceff:c.ceff/n,
+          acreff:c.acreff/n, iddq:c.iddq/n};
+}
+
+function buildChainNormView(){
+  const m=CHAIN_META;
+  const n=m.stages;
+  const norm=CHAIN_CELLS.map(normChainCell);
+
+  document.getElementById('chain-norm-conditions').textContent=chainCondStr()+` \u00b7 each value \u00f7 ${n}`;
+  document.getElementById('chain-norm-divisor').textContent=`${n} stages`;
+  document.getElementById('chain-norm-sub-delay').textContent=
+    `Raw chain delay \u00f7 ${n} \u00b7 VDD\u202f=\u202f${m.vdd} \u00b7 ${m.corner} \u00b7 ${m.technology}`;
+  document.getElementById('chain-norm-sub-ceff').textContent=
+    `Effective switching capacitance per stage \u00f7 ${n} \u00b7 ${m.vt_flavor} \u00b7 ${m.technology}`;
+  document.getElementById('chain-norm-sub-acreff').textContent=
+    `AC resistance per stage \u00f7 ${n} \u00b7 ${m.vt_flavor} \u00b7 VDD\u202f=\u202f${m.vdd} \u00b7 ${m.technology}`;
+  document.getElementById('chain-norm-sub-iddq').textContent=
+    `Static current per stage \u00f7 ${n} \u00b7 ${m.vt_flavor} \u00b7 VDD\u202f=\u202f${m.vdd} \u00b7 ${m.corner} \u00b7 ${m.technology}`;
+
+  // Table
+  const tbody=document.getElementById('chain-norm-tbody');
+  const maxSD=Math.max(...norm.map(c=>c.stage_delay));
+  tbody.innerHTML=norm.map((c,i)=>`
+    <tr>
+      <td><span class="chip chip7">${c.label}</span></td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="mono">${c.stage_delay.toFixed(5)}</span>
+          <div class="bar-track"><div class="bar-fill" style="width:${(c.stage_delay/maxSD*100).toFixed(1)}%;background:${CHAIN_COLORS[i]}"></div></div>
+        </div>
+      </td>
+      <td class="mono">${c.ceff.toFixed(5)}</td>
+      <td class="mono">${c.acreff.toFixed(5)}</td>
+      <td class="mono">${c.iddq.toFixed(5)}</td>
+    </tr>`).join('');
+
+  if(chainNormChartsBuilt) return;
+  chainNormChartsBuilt=true;
+
+  const labels=norm.map(c=>c.label);
+  const colors=CHAIN_COLORS;
+  const barOpts=(yLabel)=>({
+    responsive:true,animation:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:i=>i.dataset.label+': '+i.raw}}},
+    scales:{
+      x:{ticks:{color:'#7a85a0',font:{size:10},maxRotation:45},grid:{color:'#1c2030'}},
+      y:{ticks:{color:'#7a85a0',font:{size:10}},grid:{color:'#1c2030'},
+         title:{display:true,text:yLabel,color:'#7a85a0',font:{size:10}}}
+    }
+  });
+
+  new Chart(document.getElementById('chain-norm-delay'),{type:'bar',
+    data:{labels,datasets:[{label:'Stage Delay (ps)',data:norm.map(c=>c.stage_delay),
+      backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:4}]},
+    options:barOpts('Stage Delay (ps)')});
+
+  new Chart(document.getElementById('chain-norm-ceff'),{type:'bar',
+    data:{labels,datasets:[{label:'Ceff (fF)',data:norm.map(c=>c.ceff),
+      backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:4}]},
+    options:barOpts('Ceff (fF)')});
+
+  new Chart(document.getElementById('chain-norm-acreff'),{type:'bar',
+    data:{labels,datasets:[{label:'ACReff (KΩ)',data:norm.map(c=>c.acreff),
+      backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:4}]},
+    options:barOpts('ACReff (KΩ)')});
+
+  new Chart(document.getElementById('chain-norm-iddq'),{type:'bar',
+    data:{labels,datasets:[{label:'IDDQ/stage (nA)',data:norm.map(c=>c.iddq),
+      backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:4}]},
+    options:barOpts('IDDQ/stage (nA)')});
+}
+
 function switchDataset(val){
   const single=document.getElementById('view-single');
   const chain=document.getElementById('view-chain');
-  if(val==='chain'){
-    single.style.display='none';
-    chain.style.display='';
+  const chainNorm=document.getElementById('view-chain-norm');
+  // hide all
+  single.style.display='none';
+  chain.style.display='none';
+  chainNorm.style.display='none';
+
+  if(val==='chain'||val==='chain_norm'){
     const m=CHAIN_META;
+    const isNorm=(val==='chain_norm');
     document.getElementById('header-subtitle').textContent=
-      `${m.simulator} \u00b7 ${m.technology} \u00b7 ${m.corner} Corner \u00b7 T\u202f=\u202f${m.temp}`;
+      `${m.simulator} \u00b7 ${m.technology} \u00b7 ${m.corner} Corner \u00b7 T\u202f=\u202f${m.temp}`+
+      (isNorm?` \u00b7 Normalized \u00f7\u202f${m.stages}`:'');
     document.getElementById('header-badges').innerHTML=`
       <span class="badge">${CHAIN_CELLS.length} cells</span>
       <span class="badge">${m.vt_flavor}</span>
       <span class="badge">${m.stages}-stage chain</span>
       <span class="badge">VDD\u202f=\u202f${m.vdd}</span>
       <span class="badge">T\u202f=\u202f${m.temp} \u00b7 ${m.corner}</span>
-      <span class="badge">${m.technology}</span>`;
-    buildChainView();
+      <span class="badge">${m.technology}</span>`+
+      (isNorm?`<span class="badge" style="border-color:var(--accent);color:var(--accent)">\u00f7${m.stages} normalized</span>`:'');
+    if(isNorm){chainNorm.style.display='';buildChainNormView();}
+    else{chain.style.display='';buildChainView();}
   } else {
-    chain.style.display='none';
     single.style.display='';
     const m=SINGLE_META;
     document.getElementById('header-subtitle').textContent=singleCondStr();
