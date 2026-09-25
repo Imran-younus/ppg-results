@@ -90,6 +90,7 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
         <option value="single">Single INV — VDD Sweep (24 cells, 6/7/8TSL)</option>
         <option value="chain">101-Stage Chain — Single Point (7TSL SLVT, VDD=0.70V)</option>
         <option value="chain_norm">101-Stage Chain — Normalized to 1 Invertor (÷101)</option>
+        <option value="corr">Comparison — Single INV vs Chain÷101 @ 0.70V</option>
       </select>
     </div>
   </div>
@@ -313,6 +314,100 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
 </section>
 
 </div><!-- end #view-chain-norm -->
+
+<!-- ═══ COMPARISON VIEW ═══ -->
+<div id="view-corr" style="display:none">
+<section>
+  <div class="section-title"><span class="bar"></span>Single INV vs Chain÷101 — Correlation @ 0.70V</div>
+  <p style="font-size:12px;color:var(--muted);margin-bottom:6px;" id="corr-subtitle"></p>
+  <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:12px;margin-bottom:20px;">
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#00d4ff;margin-right:5px;vertical-align:middle"></span>Single INV simulation (v0.6SB ULVT)</span>
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#ff6b35;margin-right:5px;vertical-align:middle"></span>101-chain ÷ 101 (v0.6SB2 ULVT)</span>
+    <span style="color:var(--muted)">Only cells present in both datasets are shown. INVX2/NAND2T/NAND3T/NOR2T matched to nearest single-INV equivalent.</span>
+  </div>
+
+  <!-- Delta summary table -->
+  <div class="table-wrap" style="margin-bottom:32px">
+    <table>
+      <thead>
+        <tr>
+          <th rowspan="2">Chain Cell</th>
+          <th rowspan="2">→ Single-INV Match</th>
+          <th colspan="3" style="text-align:center;border-left:2px solid var(--border)">Stage Delay (ps)</th>
+          <th colspan="3" style="text-align:center;border-left:2px solid var(--border)">IDDQ (nA)</th>
+          <th colspan="3" style="text-align:center;border-left:2px solid var(--border)">Ceff / ACCeff (fF)</th>
+          <th colspan="2" style="text-align:center;border-left:2px solid var(--border)">ACReff</th>
+        </tr>
+        <tr>
+          <th style="text-align:right;border-left:2px solid var(--border)">Single</th>
+          <th style="text-align:right">Chain÷101</th>
+          <th style="text-align:right">Δ%</th>
+          <th style="text-align:right;border-left:2px solid var(--border)">Single</th>
+          <th style="text-align:right">Chain÷101</th>
+          <th style="text-align:right">Δ%</th>
+          <th style="text-align:right;border-left:2px solid var(--border)">Single (fF)</th>
+          <th style="text-align:right">Chain÷101 (fF)</th>
+          <th style="text-align:right">Δ%</th>
+          <th style="text-align:right;border-left:2px solid var(--border)">Single (Ω)</th>
+          <th style="text-align:right">Chain÷101 (KΩ)</th>
+        </tr>
+      </thead>
+      <tbody id="corr-tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- Grouped bar charts -->
+  <div class="section-title" style="margin-bottom:12px"><span class="bar"></span>Grouped Bar Charts — Single INV vs Chain÷101 @ 0.70V</div>
+  <div class="charts-grid" style="margin-bottom:32px">
+    <div class="chart-card">
+      <div class="chart-title">Stage Delay (ps)</div>
+      <div class="chart-sub" id="corr-bar-delay-sub"></div>
+      <canvas id="corr-bar-delay" height="240"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">IDDQ (nA)</div>
+      <div class="chart-sub" id="corr-bar-iddq-sub"></div>
+      <canvas id="corr-bar-iddq" height="240"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Ceff / ACCeff (fF)</div>
+      <div class="chart-sub" id="corr-bar-ceff-sub"></div>
+      <canvas id="corr-bar-ceff" height="240"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">ACReff — Single (Ω) left axis · Chain÷101 (KΩ) right axis</div>
+      <div class="chart-sub" id="corr-bar-acreff-sub"></div>
+      <canvas id="corr-bar-acreff" height="240"></canvas>
+    </div>
+  </div>
+
+  <!-- Scatter plots: X = single-INV, Y = chain-norm, diagonal = perfect correlation -->
+  <div class="section-title" style="margin-bottom:12px"><span class="bar"></span>Scatter Correlation — Single INV (X) vs Chain÷101 (Y) @ 0.70V</div>
+  <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">Each point = one matched cell. Dashed line = perfect 1:1 correlation. Deviation from diagonal = model difference (v0.6SB vs v0.6SB2).</p>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">Stage Delay — Scatter</div>
+      <div class="chart-sub" id="corr-sc-delay-sub"></div>
+      <canvas id="corr-sc-delay" height="260"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">IDDQ — Scatter</div>
+      <div class="chart-sub" id="corr-sc-iddq-sub"></div>
+      <canvas id="corr-sc-iddq" height="260"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Ceff / ACCeff — Scatter</div>
+      <div class="chart-sub" id="corr-sc-ceff-sub"></div>
+      <canvas id="corr-sc-ceff" height="260"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">% Difference vs Cell — All Metrics</div>
+      <div class="chart-sub" id="corr-sc-pct-sub"></div>
+      <canvas id="corr-sc-pct" height="260"></canvas>
+    </div>
+  </div>
+</section>
+</div><!-- end #view-corr -->
 
 <footer id="page-footer">PPG Delay Chain Simulation Results &nbsp;·&nbsp; Made with IBM Bob</footer>
 </div>
@@ -1263,14 +1358,287 @@ function buildChainNormView(){
     options:barOpts('IDDQ/stage (nA)')});
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// COMPARISON VIEW — Single INV (VDD sweep) vs Chain÷101 @ 0.70V
+// getCompVddIdx() finds the VDD array index matching CHAIN_META.vdd
+// automatically — works for any future chain VDD value.
+// getCorrPairs() maps chain cell labels to their single-INV equivalents.
+// ═══════════════════════════════════════════════════════════════════
+let corrChartsBuilt=false;
+
+function getCompVddIdx(){
+  const target=parseFloat(CHAIN_META.vdd);
+  let best=0,bestDiff=Infinity;
+  VDD.forEach((v,i)=>{const d=Math.abs(v-target);if(d<bestDiff){bestDiff=d;best=i;}});
+  return best;
+}
+
+// Map chain cell type suffixes → single-INV cell type key.
+// INVX2/INV→INV, NAND2B/NAND2T→NAND2B, NAND3B/NAND3T→NAND3B, NOR2B/NOR2T→NOR2B
+const CHAIN_TO_SINGLE={'INVX2':'INV','INV':'INV','NAND2B':'NAND2B','NAND2T':'NAND2B',
+                        'NAND3B':'NAND3B','NAND3T':'NAND3B','NOR2B':'NOR2B','NOR2T':'NOR2B'};
+
+function getCorrPairs(){
+  const pairs=[];
+  CHAIN_CELLS.forEach(cc=>{
+    const under=cc.label.indexOf('_');
+    const tsl=cc.label.slice(0,under);       // e.g. "7TSL"
+    const ct =cc.label.slice(under+1);        // e.g. "NAND2T"
+    const mapped=CHAIN_TO_SINGLE[ct];
+    if(!mapped) return;
+    const singleKey=tsl+'_'+mapped;
+    if(!D[singleKey]) return;
+    pairs.push({chainLabel:cc.label, singleKey, shortName:cc.label,
+                chainCell:cc, singleCell:D[singleKey], tsl});
+  });
+  return pairs;
+}
+
+function buildCorrView(){
+  const vi=getCompVddIdx();
+  const n=CHAIN_META.stages;
+  const vddLabel=VDD[vi]+'V';
+  const sm=SINGLE_META, cm=CHAIN_META;
+  const pairs=getCorrPairs();
+
+  // subtitle
+  document.getElementById('corr-subtitle').textContent=
+    `Single INV: ${sm.simulator} · ${sm.technology} ${sm.vt_flavor} · ${sm.corner} · T = ${sm.temp} · VDD = ${vddLabel}`+
+    `   ‖   Chain÷${n}: ${cm.simulator} · ${cm.technology} · ${cm.vt_flavor} · ${cm.corner} · T = ${cm.temp} · VDD = ${cm.vdd}`;
+
+  // bar/scatter chart subtitles
+  const barSub=`VDD = ${vddLabel} · ${sm.corner} corner · T = ${sm.temp} · cyan = ${sm.technology} single-INV · orange = ${cm.technology} chain÷${n}`;
+  const scSub =`X = Single INV (${sm.technology}) · Y = Chain÷${n} (${cm.technology}) · VDD = ${vddLabel} · ${sm.corner} · T = ${sm.temp}`;
+  ['delay','iddq','ceff','acreff'].forEach(k=>{
+    document.getElementById('corr-bar-'+k+'-sub').textContent=barSub;
+  });
+  ['delay','iddq','ceff','pct'].forEach(k=>{
+    document.getElementById('corr-sc-'+k+'-sub').textContent=
+      k==='pct'
+        ? `All 3 metrics · chain÷${n} vs single-INV · VDD = ${vddLabel} · ${sm.corner} · T = ${sm.temp}`
+        : scSub;
+  });
+
+  // ── Delta table ──
+  const dPct=(a,b)=>{
+    const d=(b-a)/a*100;
+    const col=Math.abs(d)<2?'#ffe93e':d>0?'#ff2d78':'#00ff9f';
+    return `<span style="color:${col}">${d>0?'+':''}${d.toFixed(1)}%</span>`;
+  };
+  document.getElementById('corr-tbody').innerHTML=pairs.map(p=>{
+    const s=p.singleCell, c=p.chainCell;
+    const sd_s=s.stage_delay[vi],    sd_c=c.stage_delay/n;
+    const iq_s=s.iddq[vi]*1e9,       iq_c=c.iddq/n;
+    const cf_s=s.acceff[vi]*1e15,    cf_c=c.ceff/n;
+    const ar_s=s.acreff[vi],         ar_c=c.acreff/n;
+    return `<tr>
+      <td><span class="chip chip7">${p.chainLabel}</span></td>
+      <td style="color:var(--muted);font-size:11px">${p.singleKey}</td>
+      <td class="mono" style="text-align:right;border-left:2px solid var(--border)">${sd_s.toFixed(4)}</td>
+      <td class="mono" style="text-align:right">${sd_c.toFixed(4)}</td>
+      <td style="text-align:right">${dPct(sd_s,sd_c)}</td>
+      <td class="mono" style="text-align:right;border-left:2px solid var(--border)">${iq_s.toFixed(4)}</td>
+      <td class="mono" style="text-align:right">${iq_c.toFixed(4)}</td>
+      <td style="text-align:right">${dPct(iq_s,iq_c)}</td>
+      <td class="mono" style="text-align:right;border-left:2px solid var(--border)">${cf_s.toFixed(4)}</td>
+      <td class="mono" style="text-align:right">${cf_c.toFixed(4)}</td>
+      <td style="text-align:right">${dPct(cf_s,cf_c)}</td>
+      <td class="mono" style="text-align:right;border-left:2px solid var(--border)">${ar_s.toFixed(2)}</td>
+      <td class="mono" style="text-align:right">${ar_c.toFixed(5)}</td>
+    </tr>`;
+  }).join('');
+
+  if(corrChartsBuilt) return;
+  corrChartsBuilt=true;
+
+  const labels=pairs.map(p=>p.chainLabel);
+  const C_S='#00d4ff', C_C='#ff6b35';
+
+  // shared grouped-bar options
+  const grpOpts=(yLabel)=>({
+    responsive:true,animation:false,
+    plugins:{
+      legend:{labels:{color:'#7a85a0',font:{size:11},boxWidth:12}},
+      tooltip:{mode:'index',intersect:false,
+        callbacks:{title:i=>`Cell: ${i[0].label} · VDD = ${vddLabel}`}}
+    },
+    scales:{
+      x:{ticks:{color:'#7a85a0',font:{size:10},maxRotation:50},grid:{color:'#1c2030'},
+         title:{display:true,text:'Cell',color:'#7a85a0',font:{size:10}}},
+      y:{ticks:{color:'#7a85a0',font:{size:10}},grid:{color:'#1c2030'},
+         title:{display:true,text:yLabel,color:'#7a85a0',font:{size:10}}}
+    }
+  });
+
+  // shared scatter options — adds a 1:1 reference line dataset
+  const scOpts=(xLabel,yLabel)=>({
+    responsive:true,animation:false,
+    plugins:{
+      legend:{labels:{color:'#7a85a0',font:{size:11},boxWidth:12}},
+      tooltip:{callbacks:{
+        title:()=>`VDD = ${vddLabel} · ${sm.corner} · T = ${sm.temp}`,
+        label:i=>i.dataset.label==='1:1 ref'?null:
+          `${i.raw.label}: X=${i.raw.x.toFixed(4)}, Y=${i.raw.y.toFixed(4)}`
+      }}
+    },
+    scales:{
+      x:{ticks:{color:'#7a85a0',font:{size:10}},grid:{color:'#1c2030'},
+         title:{display:true,text:xLabel+` — Single INV (${sm.technology}) @ ${vddLabel}`,color:'#7a85a0',font:{size:10}}},
+      y:{ticks:{color:'#7a85a0',font:{size:10}},grid:{color:'#1c2030'},
+         title:{display:true,text:yLabel+` — Chain÷${n} (${cm.technology}) @ ${cm.vdd}`,color:'#7a85a0',font:{size:10}}}
+    }
+  });
+
+  // helper: build 1:1 reference line from min→max of combined x+y values
+  function refLine(pts){
+    const allV=pts.flatMap(p=>[p.x,p.y]);
+    const mn=Math.min(...allV), mx=Math.max(...allV);
+    return [{x:mn,y:mn},{x:mx,y:mx}];
+  }
+
+  // ── BAR: Stage Delay ──
+  new Chart(document.getElementById('corr-bar-delay'),{type:'bar',data:{labels,datasets:[
+    {label:`Single INV (${sm.technology}) — Stage Delay (ps) @ ${vddLabel}`,
+     data:pairs.map(p=>p.singleCell.stage_delay[vi]),
+     backgroundColor:C_S+'99',borderColor:C_S,borderWidth:2,borderRadius:4},
+    {label:`Chain÷${n} (${cm.technology}) — Stage Delay (ps) @ ${cm.vdd}`,
+     data:pairs.map(p=>p.chainCell.stage_delay/n),
+     backgroundColor:C_C+'99',borderColor:C_C,borderWidth:2,borderRadius:4}
+  ]},options:grpOpts('Stage Delay (ps)')});
+
+  // ── BAR: IDDQ ──
+  new Chart(document.getElementById('corr-bar-iddq'),{type:'bar',data:{labels,datasets:[
+    {label:`Single INV (${sm.technology}) — IDDQ (nA) @ ${vddLabel}`,
+     data:pairs.map(p=>p.singleCell.iddq[vi]*1e9),
+     backgroundColor:C_S+'99',borderColor:C_S,borderWidth:2,borderRadius:4},
+    {label:`Chain÷${n} (${cm.technology}) — IDDQ (nA) @ ${cm.vdd}`,
+     data:pairs.map(p=>p.chainCell.iddq/n),
+     backgroundColor:C_C+'99',borderColor:C_C,borderWidth:2,borderRadius:4}
+  ]},options:grpOpts('IDDQ (nA)')});
+
+  // ── BAR: Ceff / ACCeff ──
+  new Chart(document.getElementById('corr-bar-ceff'),{type:'bar',data:{labels,datasets:[
+    {label:`Single INV (${sm.technology}) — ACCeff (fF) @ ${vddLabel}`,
+     data:pairs.map(p=>p.singleCell.acceff[vi]*1e15),
+     backgroundColor:C_S+'99',borderColor:C_S,borderWidth:2,borderRadius:4},
+    {label:`Chain÷${n} (${cm.technology}) — Ceff (fF) @ ${cm.vdd}`,
+     data:pairs.map(p=>p.chainCell.ceff/n),
+     backgroundColor:C_C+'99',borderColor:C_C,borderWidth:2,borderRadius:4}
+  ]},options:grpOpts('Capacitance (fF)')});
+
+  // ── BAR: ACReff — dual Y axis (different units) ──
+  new Chart(document.getElementById('corr-bar-acreff'),{type:'bar',data:{labels,datasets:[
+    {label:`Single INV (${sm.technology}) — ACReff (Ω) @ ${vddLabel}`,
+     data:pairs.map(p=>p.singleCell.acreff[vi]),
+     backgroundColor:C_S+'99',borderColor:C_S,borderWidth:2,borderRadius:4,yAxisID:'yL'},
+    {label:`Chain÷${n} (${cm.technology}) — ACReff (KΩ) @ ${cm.vdd}`,
+     data:pairs.map(p=>p.chainCell.acreff/n),
+     backgroundColor:C_C+'99',borderColor:C_C,borderWidth:2,borderRadius:4,yAxisID:'yR'}
+  ]},options:{responsive:true,animation:false,
+    plugins:{
+      legend:{labels:{color:'#7a85a0',font:{size:11},boxWidth:12}},
+      tooltip:{mode:'index',intersect:false,
+        callbacks:{title:i=>`Cell: ${i[0].label} · VDD = ${vddLabel}`}}
+    },
+    scales:{
+      x:{ticks:{color:'#7a85a0',font:{size:10},maxRotation:50},grid:{color:'#1c2030'},
+         title:{display:true,text:'Cell',color:'#7a85a0',font:{size:10}}},
+      yL:{position:'left',ticks:{color:C_S,font:{size:10}},grid:{color:'#1c2030'},
+          title:{display:true,text:`Single INV ACReff (Ω) · ${sm.technology} @ ${vddLabel}`,color:C_S,font:{size:10}}},
+      yR:{position:'right',ticks:{color:C_C,font:{size:10}},grid:{drawOnChartArea:false},
+          title:{display:true,text:`Chain÷${n} ACReff (KΩ) · ${cm.technology} @ ${cm.vdd}`,color:C_C,font:{size:10}}}
+    }}});
+
+  // ── SCATTER: Stage Delay ──
+  const sdPts=pairs.map(p=>({
+    x:p.singleCell.stage_delay[vi], y:p.chainCell.stage_delay/n, label:p.chainLabel
+  }));
+  const sdOpts=scOpts('Stage Delay (ps)','Stage Delay (ps)');
+  sdOpts.plugins.tooltip.callbacks.label=i=>i.dataset.label==='1:1 ref'?null:
+    `${i.raw.label}: single=${i.raw.x.toFixed(4)} ps, chain÷${n}=${i.raw.y.toFixed(4)} ps`;
+  new Chart(document.getElementById('corr-sc-delay'),{type:'scatter',data:{datasets:[
+    {label:`Cells · VDD=${vddLabel}`,data:sdPts,
+     backgroundColor:pairs.map((_,i)=>CHAIN_COLORS[i]+'cc'),
+     borderColor:pairs.map((_,i)=>CHAIN_COLORS[i]),pointRadius:9,pointHoverRadius:11},
+    {label:'1:1 ref',data:refLine(sdPts),type:'line',borderColor:'#ffffff33',borderWidth:1,
+     borderDash:[5,5],pointRadius:0,fill:false,order:0}
+  ]},options:sdOpts});
+
+  // ── SCATTER: IDDQ ──
+  const iqPts=pairs.map(p=>({
+    x:p.singleCell.iddq[vi]*1e9, y:p.chainCell.iddq/n, label:p.chainLabel
+  }));
+  const iqOpts=scOpts('IDDQ (nA)','IDDQ (nA)');
+  iqOpts.plugins.tooltip.callbacks.label=i=>i.dataset.label==='1:1 ref'?null:
+    `${i.raw.label}: single=${i.raw.x.toFixed(4)} nA, chain÷${n}=${i.raw.y.toFixed(4)} nA`;
+  new Chart(document.getElementById('corr-sc-iddq'),{type:'scatter',data:{datasets:[
+    {label:`Cells · VDD=${vddLabel}`,data:iqPts,
+     backgroundColor:pairs.map((_,i)=>CHAIN_COLORS[i]+'cc'),
+     borderColor:pairs.map((_,i)=>CHAIN_COLORS[i]),pointRadius:9,pointHoverRadius:11},
+    {label:'1:1 ref',data:refLine(iqPts),type:'line',borderColor:'#ffffff33',borderWidth:1,
+     borderDash:[5,5],pointRadius:0,fill:false,order:0}
+  ]},options:iqOpts});
+
+  // ── SCATTER: Ceff / ACCeff ──
+  const cfPts=pairs.map(p=>({
+    x:p.singleCell.acceff[vi]*1e15, y:p.chainCell.ceff/n, label:p.chainLabel
+  }));
+  const cfOpts=scOpts('ACCeff (fF)','Ceff (fF)');
+  cfOpts.plugins.tooltip.callbacks.label=i=>i.dataset.label==='1:1 ref'?null:
+    `${i.raw.label}: ACCeff=${i.raw.x.toFixed(4)} fF, Ceff÷${n}=${i.raw.y.toFixed(4)} fF`;
+  new Chart(document.getElementById('corr-sc-ceff'),{type:'scatter',data:{datasets:[
+    {label:`Cells · VDD=${vddLabel}`,data:cfPts,
+     backgroundColor:pairs.map((_,i)=>CHAIN_COLORS[i]+'cc'),
+     borderColor:pairs.map((_,i)=>CHAIN_COLORS[i]),pointRadius:9,pointHoverRadius:11},
+    {label:'1:1 ref',data:refLine(cfPts),type:'line',borderColor:'#ffffff33',borderWidth:1,
+     borderDash:[5,5],pointRadius:0,fill:false,order:0}
+  ]},options:cfOpts});
+
+  // ── % Difference bar (grouped by metric, X = cell) ──
+  const pctMetrics=[
+    {key:'delay', label:`Stage Delay · VDD=${vddLabel}`,        col:'#00d4ff',
+     fn:p=>((p.chainCell.stage_delay/n - p.singleCell.stage_delay[vi])/p.singleCell.stage_delay[vi]*100)},
+    {key:'iddq',  label:`IDDQ · VDD=${vddLabel}`,               col:'#ffe93e',
+     fn:p=>((p.chainCell.iddq/n - p.singleCell.iddq[vi]*1e9)/(p.singleCell.iddq[vi]*1e9)*100)},
+    {key:'ceff',  label:`Ceff/ACCeff · VDD=${vddLabel}`,        col:'#00ff9f',
+     fn:p=>((p.chainCell.ceff/n - p.singleCell.acceff[vi]*1e15)/(p.singleCell.acceff[vi]*1e15)*100)}
+  ];
+  new Chart(document.getElementById('corr-sc-pct'),{type:'bar',data:{labels,datasets:
+    pctMetrics.map(mk=>({
+      label:mk.label,
+      data:pairs.map(mk.fn),
+      backgroundColor:mk.col+'99',borderColor:mk.col,borderWidth:2,borderRadius:4
+    }))
+  },options:{responsive:true,animation:false,
+    plugins:{
+      legend:{labels:{color:'#7a85a0',font:{size:11},boxWidth:12}},
+      tooltip:{mode:'index',intersect:false,
+        callbacks:{
+          title:i=>`Cell: ${i[0].label} · VDD = ${vddLabel} · ${sm.corner} · T = ${sm.temp}`,
+          label:i=>`${i.dataset.label}: ${i.raw>0?'+':''}${i.raw.toFixed(2)}% vs single-INV`
+        }}
+    },
+    scales:{
+      x:{ticks:{color:'#7a85a0',font:{size:10},maxRotation:50},grid:{color:'#1c2030'},
+         title:{display:true,text:'Cell',color:'#7a85a0',font:{size:10}}},
+      y:{ticks:{color:'#7a85a0',font:{size:10},callback:v=>v.toFixed(1)+'%'},
+         grid:{color:'#1c2030'},
+         title:{display:true,
+           text:`% diff: (chain÷${n} − single-INV) / single-INV × 100 · VDD=${vddLabel}`,
+           color:'#7a85a0',font:{size:10}}}
+    }}});
+}
+
 function switchDataset(val){
   const single=document.getElementById('view-single');
   const chain=document.getElementById('view-chain');
   const chainNorm=document.getElementById('view-chain-norm');
+  const corrView=document.getElementById('view-corr');
   // hide all
   single.style.display='none';
   chain.style.display='none';
   chainNorm.style.display='none';
+  corrView.style.display='none';
 
   if(val==='chain'||val==='chain_norm'){
     const m=CHAIN_META;
@@ -1288,6 +1656,18 @@ function switchDataset(val){
       (isNorm?`<span class="badge" style="border-color:var(--accent);color:var(--accent)">\u00f7${m.stages} normalized</span>`:'');
     if(isNorm){chainNorm.style.display='';buildChainNormView();}
     else{chain.style.display='';buildChainView();}
+  } else if(val==='corr'){
+    corrView.style.display='';
+    const sm=SINGLE_META, cm=CHAIN_META;
+    document.getElementById('header-subtitle').textContent=
+      `${sm.technology} ${sm.vt_flavor} Single-INV  vs  ${cm.technology} Chain\u00f7${cm.stages} \u00b7 VDD\u202f=\u202f${cm.vdd} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp}`;
+    document.getElementById('header-badges').innerHTML=`
+      <span class="badge" style="border-color:#00d4ff;color:#00d4ff">Single INV \u00b7 ${sm.technology}</span>
+      <span class="badge" style="border-color:#ff6b35;color:#ff6b35">Chain\u00f7${cm.stages} \u00b7 ${cm.technology}</span>
+      <span class="badge">VDD\u202f=\u202f${cm.vdd}</span>
+      <span class="badge">${sm.corner} \u00b7 T\u202f=\u202f${sm.temp}</span>
+      <span class="badge">${getCorrPairs().length} matched cells \u00b7 4 metrics</span>`;
+    buildCorrView();
   } else {
     single.style.display='';
     const m=SINGLE_META;
