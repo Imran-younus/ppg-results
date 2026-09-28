@@ -319,11 +319,20 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
 <div id="view-corr" style="display:none">
 <section>
   <div class="section-title"><span class="bar"></span>Single INV vs Chain÷101 — Correlation @ 0.70V</div>
-  <p style="font-size:12px;color:var(--muted);margin-bottom:6px;" id="corr-subtitle"></p>
-  <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:12px;margin-bottom:20px;">
-    <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#00d4ff;margin-right:5px;vertical-align:middle"></span>Single INV simulation (v0.6SB ULVT)</span>
-    <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#ff6b35;margin-right:5px;vertical-align:middle"></span>101-chain ÷ 101 (v0.6SB2 ULVT)</span>
-    <span style="color:var(--muted)">Only cells present in both datasets are shown. INVX2/NAND2T/NAND3T/NOR2T matched to nearest single-INV equivalent.</span>
+  <p style="font-size:12px;color:var(--muted);margin-bottom:10px;" id="corr-subtitle"></p>
+
+  <!-- Legend + context notes -->
+  <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:20px;font-size:12px;line-height:1.8">
+    <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:10px;">
+      <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#00d4ff;margin-right:6px;vertical-align:middle"></span><strong style="color:#00d4ff">Single INV</strong> — v0.6SB model (Spice-260520-sandbox) · ULVT · single-cell SPICE · VDD sweep</span>
+      <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#ff6b35;margin-right:6px;vertical-align:middle"></span><strong style="color:#ff6b35">Chain÷101</strong> — v0.6SB2 model (Spice-260604-sandbox) · ULVT · 101-stage oscillating chain · single VDD point</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:8px;color:var(--muted)">
+      <div><span style="color:#ffe93e">⚠ Stage Delay:</span> ~6% difference expected — v0.6SB2 adds dRint=−14 Ω·μm &amp; Rext=−25 Ω·μm vs v0.6SB, making chain cells slightly slower.</div>
+      <div><span style="color:#ff2d78">⚠ IDDQ — NOT directly comparable:</span> Single-INV IDDQ = DC leakage of 1 cell (FIND I AT=0 ps). Chain÷101 IDDQ = per-stage dynamic current in an oscillating 101-cell ring — fundamentally different quantities.</div>
+      <div><span style="color:#00ff9f">✓ Ceff / ACCeff:</span> Comparable — both derived from charge-based extraction. Small delta reflects model difference only.</div>
+      <div><span style="color:#00ff9f">✓ ACReff:</span> Units differ (single=Ω, chain=KΩ) — shown on separate axes. Ratio reflects model + circuit topology difference.</div>
+    </div>
   </div>
 
   <!-- Delta summary table -->
@@ -333,20 +342,19 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
         <tr>
           <th rowspan="2">Chain Cell</th>
           <th rowspan="2">→ Single-INV Match</th>
-          <th colspan="3" style="text-align:center;border-left:2px solid var(--border)">Stage Delay (ps)</th>
-          <th colspan="3" style="text-align:center;border-left:2px solid var(--border)">IDDQ (nA)</th>
+          <th colspan="3" style="text-align:center;border-left:2px solid var(--border)">Stage Delay (ps) · v0.6SB vs v0.6SB2</th>
+          <th colspan="2" style="text-align:center;border-left:2px solid var(--border);color:#ff2d78">IDDQ ⚠ not comparable</th>
           <th colspan="3" style="text-align:center;border-left:2px solid var(--border)">Ceff / ACCeff (fF)</th>
           <th colspan="2" style="text-align:center;border-left:2px solid var(--border)">ACReff</th>
         </tr>
         <tr>
-          <th style="text-align:right;border-left:2px solid var(--border)">Single</th>
-          <th style="text-align:right">Chain÷101</th>
+          <th style="text-align:right;border-left:2px solid var(--border)">Single (v0.6SB)</th>
+          <th style="text-align:right">Chain÷101 (v0.6SB2)</th>
           <th style="text-align:right">Δ%</th>
-          <th style="text-align:right;border-left:2px solid var(--border)">Single</th>
-          <th style="text-align:right">Chain÷101</th>
-          <th style="text-align:right">Δ%</th>
-          <th style="text-align:right;border-left:2px solid var(--border)">Single (fF)</th>
-          <th style="text-align:right">Chain÷101 (fF)</th>
+          <th style="text-align:right;border-left:2px solid var(--border);color:#ff2d78">Single DC leakage (nA)</th>
+          <th style="text-align:right;color:#ff2d78">Chain÷101 dynamic/stage (nA)</th>
+          <th style="text-align:right;border-left:2px solid var(--border)">Single ACCeff (fF)</th>
+          <th style="text-align:right">Chain÷101 Ceff (fF)</th>
           <th style="text-align:right">Δ%</th>
           <th style="text-align:right;border-left:2px solid var(--border)">Single (Ω)</th>
           <th style="text-align:right">Chain÷101 (KΩ)</th>
@@ -357,20 +365,21 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
   </div>
 
   <!-- Grouped bar charts -->
-  <div class="section-title" style="margin-bottom:12px"><span class="bar"></span>Grouped Bar Charts — Single INV vs Chain÷101 @ 0.70V</div>
+  <div class="section-title" style="margin-bottom:4px"><span class="bar"></span>Grouped Bar Charts — Single INV (v0.6SB) vs Chain÷101 (v0.6SB2) @ 0.70V</div>
+  <p style="font-size:11px;color:var(--muted);margin-bottom:14px;">Cyan = Single-INV v0.6SB · Orange = Chain÷101 v0.6SB2 · ~6% delay delta = model version difference, not measurement error</p>
   <div class="charts-grid" style="margin-bottom:32px">
     <div class="chart-card">
-      <div class="chart-title">Stage Delay (ps)</div>
+      <div class="chart-title">Stage Delay (ps) — v0.6SB vs v0.6SB2</div>
       <div class="chart-sub" id="corr-bar-delay-sub"></div>
       <canvas id="corr-bar-delay" height="240"></canvas>
     </div>
     <div class="chart-card">
-      <div class="chart-title">IDDQ (nA)</div>
+      <div class="chart-title">IDDQ (nA) — ⚠ Different circuits, not directly comparable</div>
       <div class="chart-sub" id="corr-bar-iddq-sub"></div>
       <canvas id="corr-bar-iddq" height="240"></canvas>
     </div>
     <div class="chart-card">
-      <div class="chart-title">Ceff / ACCeff (fF)</div>
+      <div class="chart-title">Ceff / ACCeff (fF) — comparable metric</div>
       <div class="chart-sub" id="corr-bar-ceff-sub"></div>
       <canvas id="corr-bar-ceff" height="240"></canvas>
     </div>
@@ -381,27 +390,27 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
     </div>
   </div>
 
-  <!-- Scatter plots: X = single-INV, Y = chain-norm, diagonal = perfect correlation -->
-  <div class="section-title" style="margin-bottom:12px"><span class="bar"></span>Scatter Correlation — Single INV (X) vs Chain÷101 (Y) @ 0.70V</div>
-  <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">Each point = one matched cell. Dashed line = perfect 1:1 correlation. Deviation from diagonal = model difference (v0.6SB vs v0.6SB2).</p>
+  <!-- Scatter plots -->
+  <div class="section-title" style="margin-bottom:4px"><span class="bar"></span>Scatter Correlation — Single INV v0.6SB (X) vs Chain÷101 v0.6SB2 (Y) @ 0.70V</div>
+  <p style="font-size:11px;color:var(--muted);margin-bottom:16px;">Each point = one matched cell · Dashed line = perfect 1:1 (points above = chain larger, below = chain smaller) · Deviation from diagonal = v0.6SB→v0.6SB2 model delta</p>
   <div class="charts-grid">
     <div class="chart-card">
-      <div class="chart-title">Stage Delay — Scatter</div>
+      <div class="chart-title">Stage Delay — Scatter (v0.6SB vs v0.6SB2)</div>
       <div class="chart-sub" id="corr-sc-delay-sub"></div>
       <canvas id="corr-sc-delay" height="260"></canvas>
     </div>
     <div class="chart-card">
-      <div class="chart-title">IDDQ — Scatter</div>
+      <div class="chart-title">IDDQ — ⚠ Single DC leakage vs Chain dynamic/stage</div>
       <div class="chart-sub" id="corr-sc-iddq-sub"></div>
       <canvas id="corr-sc-iddq" height="260"></canvas>
     </div>
     <div class="chart-card">
-      <div class="chart-title">Ceff / ACCeff — Scatter</div>
+      <div class="chart-title">Ceff / ACCeff — Scatter (comparable)</div>
       <div class="chart-sub" id="corr-sc-ceff-sub"></div>
       <canvas id="corr-sc-ceff" height="260"></canvas>
     </div>
     <div class="chart-card">
-      <div class="chart-title">% Difference vs Cell — All Metrics</div>
+      <div class="chart-title">% Difference — Stage Delay &amp; Ceff only (IDDQ excluded)</div>
       <div class="chart-sub" id="corr-sc-pct-sub"></div>
       <canvas id="corr-sc-pct" height="260"></canvas>
     </div>
@@ -1404,20 +1413,19 @@ function buildCorrView(){
   // subtitle
   document.getElementById('corr-subtitle').textContent=
     `Single INV: ${sm.simulator} · ${sm.technology} ${sm.vt_flavor} · ${sm.corner} · T = ${sm.temp} · VDD = ${vddLabel}`+
-    `   ‖   Chain÷${n}: ${cm.simulator} · ${cm.technology} · ${cm.vt_flavor} · ${cm.corner} · T = ${cm.temp} · VDD = ${cm.vdd}`;
+    `   ‖   Chain÷${n}: ${cm.simulator} · ${cm.technology} (v0.6SB2) · ${cm.vt_flavor} · ${cm.corner} · T = ${cm.temp} · VDD = ${cm.vdd}`;
 
   // bar/scatter chart subtitles
-  const barSub=`VDD = ${vddLabel} · ${sm.corner} corner · T = ${sm.temp} · cyan = ${sm.technology} single-INV · orange = ${cm.technology} chain÷${n}`;
-  const scSub =`X = Single INV (${sm.technology}) · Y = Chain÷${n} (${cm.technology}) · VDD = ${vddLabel} · ${sm.corner} · T = ${sm.temp}`;
-  ['delay','iddq','ceff','acreff'].forEach(k=>{
-    document.getElementById('corr-bar-'+k+'-sub').textContent=barSub;
-  });
-  ['delay','iddq','ceff','pct'].forEach(k=>{
-    document.getElementById('corr-sc-'+k+'-sub').textContent=
-      k==='pct'
-        ? `All 3 metrics · chain÷${n} vs single-INV · VDD = ${vddLabel} · ${sm.corner} · T = ${sm.temp}`
-        : scSub;
-  });
+  const barSub=`VDD = ${vddLabel} · ${sm.corner} · T = ${sm.temp} · Cyan = Single-INV ${sm.technology} (v0.6SB) · Orange = Chain÷${n} (v0.6SB2)`;
+  const scSub =`X = Single-INV v0.6SB (${sm.technology}) · Y = Chain÷${n} v0.6SB2 (${cm.technology}) · VDD = ${vddLabel} · ${sm.corner} · T = ${sm.temp}`;
+  const iddqBarSub=`⚠ Not directly comparable — Single = DC leakage FIND AT=0ps · Chain÷${n} = per-stage dynamic current in oscillating ring · VDD = ${vddLabel}`;
+  const iddqScSub =`⚠ Different quantities: X = single-cell DC leakage (nA) · Y = oscillating chain per-stage current (nA) · shown for reference only`;
+  ['delay','ceff','acreff'].forEach(k=>document.getElementById('corr-bar-'+k+'-sub').textContent=barSub);
+  document.getElementById('corr-bar-iddq-sub').textContent=iddqBarSub;
+  ['delay','ceff'].forEach(k=>document.getElementById('corr-sc-'+k+'-sub').textContent=scSub);
+  document.getElementById('corr-sc-iddq-sub').textContent=iddqScSub;
+  document.getElementById('corr-sc-pct-sub').textContent=
+    `Stage Delay & Ceff only — IDDQ excluded (not comparable) · v0.6SB2 chain÷${n} vs v0.6SB single-INV · VDD = ${vddLabel} · ${sm.corner} · T = ${sm.temp}`;
 
   // ── Delta table ──
   const dPct=(a,b)=>{
@@ -1437,9 +1445,8 @@ function buildCorrView(){
       <td class="mono" style="text-align:right;border-left:2px solid var(--border)">${sd_s.toFixed(4)}</td>
       <td class="mono" style="text-align:right">${sd_c.toFixed(4)}</td>
       <td style="text-align:right">${dPct(sd_s,sd_c)}</td>
-      <td class="mono" style="text-align:right;border-left:2px solid var(--border)">${iq_s.toFixed(4)}</td>
-      <td class="mono" style="text-align:right">${iq_c.toFixed(4)}</td>
-      <td style="text-align:right">${dPct(iq_s,iq_c)}</td>
+      <td class="mono" style="text-align:right;border-left:2px solid var(--border);color:#ff2d78;opacity:0.7">${iq_s.toFixed(4)}</td>
+      <td class="mono" style="text-align:right;color:#ff2d78;opacity:0.7">${iq_c.toFixed(4)}</td>
       <td class="mono" style="text-align:right;border-left:2px solid var(--border)">${cf_s.toFixed(4)}</td>
       <td class="mono" style="text-align:right">${cf_c.toFixed(4)}</td>
       <td style="text-align:right">${dPct(cf_s,cf_c)}</td>
@@ -1498,23 +1505,25 @@ function buildCorrView(){
 
   // ── BAR: Stage Delay ──
   new Chart(document.getElementById('corr-bar-delay'),{type:'bar',data:{labels,datasets:[
-    {label:`Single INV (${sm.technology}) — Stage Delay (ps) @ ${vddLabel}`,
+    {label:`Single-INV v0.6SB (${sm.technology}) — Stage Delay (ps) @ ${vddLabel}`,
      data:pairs.map(p=>p.singleCell.stage_delay[vi]),
      backgroundColor:C_S+'99',borderColor:C_S,borderWidth:2,borderRadius:4},
-    {label:`Chain÷${n} (${cm.technology}) — Stage Delay (ps) @ ${cm.vdd}`,
+    {label:`Chain÷${n} v0.6SB2 (${cm.technology}) — Stage Delay (ps) @ ${cm.vdd}`,
      data:pairs.map(p=>p.chainCell.stage_delay/n),
      backgroundColor:C_C+'99',borderColor:C_C,borderWidth:2,borderRadius:4}
   ]},options:grpOpts('Stage Delay (ps)')});
 
-  // ── BAR: IDDQ ──
+  // ── BAR: IDDQ — shown with warning; different circuit types ──
+  const iddqGrpOpts=grpOpts('IDDQ (nA) — ⚠ different circuits');
+  iddqGrpOpts.plugins.tooltip.callbacks.afterBody=()=>['⚠ Single = DC leakage AT=0ps','⚠ Chain = dynamic per-stage current'];
   new Chart(document.getElementById('corr-bar-iddq'),{type:'bar',data:{labels,datasets:[
-    {label:`Single INV (${sm.technology}) — IDDQ (nA) @ ${vddLabel}`,
+    {label:`Single-INV DC leakage (nA) @ ${vddLabel} — FIND AT=0ps`,
      data:pairs.map(p=>p.singleCell.iddq[vi]*1e9),
-     backgroundColor:C_S+'99',borderColor:C_S,borderWidth:2,borderRadius:4},
-    {label:`Chain÷${n} (${cm.technology}) — IDDQ (nA) @ ${cm.vdd}`,
+     backgroundColor:C_S+'55',borderColor:C_S+'88',borderWidth:2,borderRadius:4,borderDash:[4,4]},
+    {label:`Chain÷${n} dynamic/stage (nA) @ ${cm.vdd} — oscillating ring`,
      data:pairs.map(p=>p.chainCell.iddq/n),
-     backgroundColor:C_C+'99',borderColor:C_C,borderWidth:2,borderRadius:4}
-  ]},options:grpOpts('IDDQ (nA)')});
+     backgroundColor:C_C+'55',borderColor:C_C+'88',borderWidth:2,borderRadius:4,borderDash:[4,4]}
+  ]},options:iddqGrpOpts});
 
   // ── BAR: Ceff / ACCeff ──
   new Chart(document.getElementById('corr-bar-ceff'),{type:'bar',data:{labels,datasets:[
@@ -1594,13 +1603,11 @@ function buildCorrView(){
      borderDash:[5,5],pointRadius:0,fill:false,order:0}
   ]},options:cfOpts});
 
-  // ── % Difference bar (grouped by metric, X = cell) ──
+  // ── % Difference bar — Stage Delay & Ceff only; IDDQ excluded (not comparable) ──
   const pctMetrics=[
-    {key:'delay', label:`Stage Delay · VDD=${vddLabel}`,        col:'#00d4ff',
+    {label:`Stage Delay % diff · v0.6SB2 vs v0.6SB · VDD=${vddLabel}`, col:'#00d4ff',
      fn:p=>((p.chainCell.stage_delay/n - p.singleCell.stage_delay[vi])/p.singleCell.stage_delay[vi]*100)},
-    {key:'iddq',  label:`IDDQ · VDD=${vddLabel}`,               col:'#ffe93e',
-     fn:p=>((p.chainCell.iddq/n - p.singleCell.iddq[vi]*1e9)/(p.singleCell.iddq[vi]*1e9)*100)},
-    {key:'ceff',  label:`Ceff/ACCeff · VDD=${vddLabel}`,        col:'#00ff9f',
+    {label:`Ceff/ACCeff % diff · v0.6SB2 vs v0.6SB · VDD=${vddLabel}`, col:'#00ff9f',
      fn:p=>((p.chainCell.ceff/n - p.singleCell.acceff[vi]*1e15)/(p.singleCell.acceff[vi]*1e15)*100)}
   ];
   new Chart(document.getElementById('corr-sc-pct'),{type:'bar',data:{labels,datasets:
@@ -1615,7 +1622,7 @@ function buildCorrView(){
       tooltip:{mode:'index',intersect:false,
         callbacks:{
           title:i=>`Cell: ${i[0].label} · VDD = ${vddLabel} · ${sm.corner} · T = ${sm.temp}`,
-          label:i=>`${i.dataset.label}: ${i.raw>0?'+':''}${i.raw.toFixed(2)}% vs single-INV`
+          label:i=>`${i.dataset.label}: ${i.raw>0?'+':''}${i.raw.toFixed(2)}% (chain÷${n} v0.6SB2 vs single-INV v0.6SB)`
         }}
     },
     scales:{
@@ -1624,7 +1631,7 @@ function buildCorrView(){
       y:{ticks:{color:'#7a85a0',font:{size:10},callback:v=>v.toFixed(1)+'%'},
          grid:{color:'#1c2030'},
          title:{display:true,
-           text:`% diff: (chain÷${n} − single-INV) / single-INV × 100 · VDD=${vddLabel}`,
+           text:`% diff: (v0.6SB2 chain÷${n} − v0.6SB single-INV) / single-INV × 100 · VDD=${vddLabel}`,
            color:'#7a85a0',font:{size:10}}}
     }}});
 }
