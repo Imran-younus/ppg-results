@@ -87,11 +87,10 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
       <label style="font-size:12px;color:var(--muted);white-space:nowrap;">Dataset:</label>
       <select id="dataset-select" onchange="switchDataset(this.value)"
         style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;">
-        <option value="single">① Single INV — VDD Sweep (24 cells, 6/7/8TSL)</option>
-        <option value="chain_raw">② 101-Stage Chain — Raw Ring Oscillator Totals (×101)</option>
-        <option value="chain">③ 101-Stage Chain — Per-Stage (÷101, as reported by HSPICE)</option>
-        <option value="chain_norm">④ Chain ÷101 — Normalized to Single Invertor Equivalent</option>
-        <option value="corr">⑤ Comparison — Single INV vs Chain Normalized @ 0.70V</option>
+        <option value="single">Single Invertor — VDD Sweep</option>
+        <option value="chain_raw">101-Stage Chain — Full Ring Results</option>
+        <option value="chain">101-Stage Chain — Per Stage</option>
+        <option value="corr">Comparison — Single INV vs Chain Per Stage</option>
       </select>
     </div>
   </div>
@@ -321,73 +320,21 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
 </div><!-- end #view-chain -->
 
 <!-- ═══ CHAIN NORMALIZED VIEW ═══ -->
-<div id="view-chain-norm" style="display:none">
-<section>
-  <div class="section-title"><span class="bar"></span>④ Chain ÷<span id="chain-norm-divisor-title"></span> — Normalized to Single Invertor Equivalent</div>
-  <p style="font-size:12px;color:var(--muted);margin-bottom:10px;" id="chain-norm-conditions"></p>
-  <div style="background:var(--surface2);border:1px solid #00ff9f55;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.7">
-    <span style="color:#00ff9f">✓ Normalized for single-invertor comparison.</span>
-    Scalable metrics from the raw 101-stage ring totals are divided by <code id="chain-norm-stages-note"></code> to yield per-invertor-equivalent values.
-    ACReff is an intrinsic ratio (V/I) and is <strong>not divided</strong> — it is identical to the per-stage view.
-    <br>Formula: <code>norm_stage_delay = raw_stage_delay ÷ STAGES</code> &nbsp;|&nbsp; <code>norm_ceff = raw_ceff ÷ STAGES</code> &nbsp;|&nbsp; <code>norm_iddq = raw_iddq ÷ STAGES</code>
-  </div>
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Cell</th>
-          <th>Norm. Stage Delay (ps) [raw ÷ STAGES]</th>
-          <th>Norm. Ceff (fF) [raw ÷ STAGES]</th>
-          <th>ACReff (KΩ) [intrinsic — unchanged]</th>
-          <th>Norm. IDDQ (nA) [raw ÷ STAGES]</th>
-        </tr>
-      </thead>
-      <tbody id="chain-norm-tbody"></tbody>
-    </table>
-  </div>
-</section>
-<section>
-  <div class="section-title"><span class="bar"></span>Chain Normalized ÷<span id="chain-norm-divisor-chart-title"></span> — Bar Charts</div>
-  <div class="charts-grid">
-    <div class="chart-card">
-      <div class="chart-title">Normalized Stage Delay (ps) — raw ÷ STAGES</div>
-      <div class="chart-sub" id="chain-norm-sub-delay"></div>
-      <canvas id="chain-norm-delay" height="220"></canvas>
-    </div>
-    <div class="chart-card">
-      <div class="chart-title">Normalized Ceff (fF) — raw ÷ STAGES</div>
-      <div class="chart-sub" id="chain-norm-sub-ceff"></div>
-      <canvas id="chain-norm-ceff" height="220"></canvas>
-    </div>
-    <div class="chart-card">
-      <div class="chart-title">ACReff (KΩ) — intrinsic ratio, not scaled</div>
-      <div class="chart-sub" id="chain-norm-sub-acreff"></div>
-      <canvas id="chain-norm-acreff" height="220"></canvas>
-    </div>
-    <div class="chart-card">
-      <div class="chart-title">Normalized IDDQ (nA) — raw ÷ STAGES</div>
-      <div class="chart-sub" id="chain-norm-sub-iddq"></div>
-      <canvas id="chain-norm-iddq" height="220"></canvas>
-    </div>
-  </div>
-</section>
-</div><!-- end #view-chain-norm -->
-
 <!-- ═══ COMPARISON VIEW ═══ -->
 <div id="view-corr" style="display:none">
 <section>
-  <div class="section-title"><span class="bar"></span>⑤ Comparison — Single INV (v0.6SB) vs Chain Normalized ÷STAGES (v0.6SB2) @ 0.70V</div>
+  <div class="section-title"><span class="bar"></span>Comparison — Single INV vs Chain Per-Stage @ 0.70V</div>
   <p style="font-size:12px;color:var(--muted);margin-bottom:10px;" id="corr-subtitle"></p>
 
   <!-- Legend + context notes -->
   <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:20px;font-size:12px;line-height:1.8">
     <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:10px;">
       <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#00d4ff;margin-right:6px;vertical-align:middle"></span><strong style="color:#00d4ff">Single INV</strong> — v0.6SB model (Spice-260520-sandbox) · ULVT · single-cell SPICE · VDD sweep</span>
-      <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#ff6b35;margin-right:6px;vertical-align:middle"></span><strong style="color:#ff6b35">Chain Normalized ÷STAGES</strong> — v0.6SB2 model (Spice-260604-sandbox) · ULVT · 101-stage oscillating chain · normalized to single-invertor equivalent</span>
+      <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#ff6b35;margin-right:6px;vertical-align:middle"></span><strong style="color:#ff6b35">Chain Per-Stage</strong> — v0.6SB2 model (Spice-260604-sandbox) · ULVT · 101-stage chain · per-stage values as reported by HSPICE</span>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:8px;color:var(--muted)">
       <div><span style="color:#ffe93e">⚠ Stage Delay:</span> ~6% difference expected — v0.6SB2 adds dRint=−14 Ω·μm &amp; Rext=−25 Ω·μm vs v0.6SB, making chain cells slightly slower.</div>
-      <div><span style="color:#ff2d78">⚠ IDDQ — NOT directly comparable:</span> Single-INV IDDQ = DC leakage of 1 cell (FIND I AT=0 ps). Chain normalized IDDQ = per-stage dynamic current in an oscillating 101-cell ring — fundamentally different quantities.</div>
+      <div><span style="color:#ff2d78">⚠ IDDQ — NOT directly comparable:</span> Single-INV IDDQ = DC leakage of 1 cell (FIND I AT=0 ps). Chain per-stage IDDQ = dynamic current per stage in an oscillating ring — fundamentally different quantities.</div>
       <div><span style="color:#00ff9f">✓ Ceff / ACCeff:</span> Comparable — both derived from charge-based extraction. Small delta reflects model difference only.</div>
       <div><span style="color:#00ff9f">✓ ACReff:</span> Units differ (single=Ω, chain=KΩ) — shown on separate axes. Ratio reflects model + circuit topology difference.</div>
     </div>
@@ -400,22 +347,22 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
         <tr>
           <th rowspan="2">Chain Cell</th>
           <th rowspan="2">→ Single-INV Match</th>
-          <th colspan="3" style="text-align:center;border-left:2px solid var(--border)">Stage Delay (ps) · Single v0.6SB vs Chain Norm v0.6SB2</th>
+          <th colspan="3" style="text-align:center;border-left:2px solid var(--border)">Stage Delay (ps)</th>
           <th colspan="2" style="text-align:center;border-left:2px solid var(--border);color:#ff2d78">IDDQ ⚠ not comparable</th>
           <th colspan="3" style="text-align:center;border-left:2px solid var(--border)">Ceff / ACCeff (fF)</th>
           <th colspan="2" style="text-align:center;border-left:2px solid var(--border)">ACReff</th>
         </tr>
         <tr>
           <th style="text-align:right;border-left:2px solid var(--border)">Single INV (v0.6SB)</th>
-          <th style="text-align:right">Chain Norm ÷STAGES (v0.6SB2)</th>
+          <th style="text-align:right">Chain Per-Stage (v0.6SB2)</th>
           <th style="text-align:right">Δ%</th>
           <th style="text-align:right;border-left:2px solid var(--border);color:#ff2d78">Single DC leakage (nA)</th>
-          <th style="text-align:right;color:#ff2d78">Chain Norm dynamic/stage (nA)</th>
+          <th style="text-align:right;color:#ff2d78">Chain dynamic/stage (nA)</th>
           <th style="text-align:right;border-left:2px solid var(--border)">Single ACCeff (fF)</th>
-          <th style="text-align:right">Chain Norm Ceff (fF)</th>
+          <th style="text-align:right">Chain Ceff (fF)</th>
           <th style="text-align:right">Δ%</th>
           <th style="text-align:right;border-left:2px solid var(--border)">Single ACReff (Ω)</th>
-          <th style="text-align:right">Chain Norm ACReff (KΩ)</th>
+          <th style="text-align:right">Chain ACReff (KΩ)</th>
         </tr>
       </thead>
       <tbody id="corr-tbody"></tbody>
@@ -423,52 +370,52 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
   </div>
 
   <!-- Grouped bar charts -->
-  <div class="section-title" style="margin-bottom:4px"><span class="bar"></span>Grouped Bar Charts — Single INV (v0.6SB) vs Chain Normalized ÷STAGES (v0.6SB2) @ 0.70V</div>
-  <p style="font-size:11px;color:var(--muted);margin-bottom:14px;">Cyan = Single INV v0.6SB · Orange = Chain Normalized ÷STAGES v0.6SB2 · ~6% delay delta = model version difference, not measurement error</p>
+  <div class="section-title" style="margin-bottom:4px"><span class="bar"></span>Grouped Bar Charts — Single INV vs Chain Per-Stage @ 0.70V</div>
+  <p style="font-size:11px;color:var(--muted);margin-bottom:14px;">Cyan = Single INV (v0.6SB) · Orange = Chain Per-Stage (v0.6SB2) · ~6% delay delta expected due to model version difference</p>
   <div class="charts-grid" style="margin-bottom:32px">
     <div class="chart-card">
-      <div class="chart-title">Stage Delay (ps) — Single INV (v0.6SB) vs Chain Norm (v0.6SB2)</div>
+      <div class="chart-title">Stage Delay (ps)</div>
       <div class="chart-sub" id="corr-bar-delay-sub"></div>
       <canvas id="corr-bar-delay" height="240"></canvas>
     </div>
     <div class="chart-card">
-      <div class="chart-title">IDDQ (nA) — ⚠ Single DC leakage vs Chain per-stage dynamic current (not comparable)</div>
+      <div class="chart-title">IDDQ (nA) — ⚠ Not directly comparable</div>
       <div class="chart-sub" id="corr-bar-iddq-sub"></div>
       <canvas id="corr-bar-iddq" height="240"></canvas>
     </div>
     <div class="chart-card">
-      <div class="chart-title">Ceff / ACCeff (fF) — Single INV ACCeff vs Chain Norm Ceff (comparable)</div>
+      <div class="chart-title">Ceff / ACCeff (fF)</div>
       <div class="chart-sub" id="corr-bar-ceff-sub"></div>
       <canvas id="corr-bar-ceff" height="240"></canvas>
     </div>
     <div class="chart-card">
-      <div class="chart-title">ACReff — Single INV (Ω) left axis · Chain Norm (KΩ) right axis</div>
+      <div class="chart-title">ACReff — Single INV (Ω) · Chain Per-Stage (KΩ)</div>
       <div class="chart-sub" id="corr-bar-acreff-sub"></div>
       <canvas id="corr-bar-acreff" height="240"></canvas>
     </div>
   </div>
 
   <!-- Scatter plots -->
-  <div class="section-title" style="margin-bottom:4px"><span class="bar"></span>Scatter Correlation — Single INV v0.6SB (X-axis) vs Chain Normalized v0.6SB2 (Y-axis) @ 0.70V</div>
-  <p style="font-size:11px;color:var(--muted);margin-bottom:16px;">Each point = one matched cell · Dashed line = perfect 1:1 · Points above diagonal = chain larger · Deviation from diagonal = v0.6SB→v0.6SB2 model delta</p>
+  <div class="section-title" style="margin-bottom:4px"><span class="bar"></span>Scatter Plots — Single INV (X) vs Chain Per-Stage (Y) @ 0.70V</div>
+  <p style="font-size:11px;color:var(--muted);margin-bottom:16px;">Each point = one cell · Dashed line = 1:1 · Points above = chain larger · Deviation from diagonal = v0.6SB → v0.6SB2 model difference</p>
   <div class="charts-grid">
     <div class="chart-card">
-      <div class="chart-title">Stage Delay — Single INV v0.6SB (X) vs Chain Norm v0.6SB2 (Y)</div>
+      <div class="chart-title">Stage Delay (ps)</div>
       <div class="chart-sub" id="corr-sc-delay-sub"></div>
       <canvas id="corr-sc-delay" height="260"></canvas>
     </div>
     <div class="chart-card">
-      <div class="chart-title">IDDQ — ⚠ Single DC leakage (X) vs Chain Norm dynamic/stage (Y)</div>
+      <div class="chart-title">IDDQ — ⚠ Not directly comparable</div>
       <div class="chart-sub" id="corr-sc-iddq-sub"></div>
       <canvas id="corr-sc-iddq" height="260"></canvas>
     </div>
     <div class="chart-card">
-      <div class="chart-title">Ceff — Single INV ACCeff (X) vs Chain Norm Ceff (Y)</div>
+      <div class="chart-title">Ceff / ACCeff (fF)</div>
       <div class="chart-sub" id="corr-sc-ceff-sub"></div>
       <canvas id="corr-sc-ceff" height="260"></canvas>
     </div>
     <div class="chart-card">
-      <div class="chart-title">% Difference — Stage Delay &amp; Ceff · Chain Norm vs Single INV (IDDQ excluded)</div>
+      <div class="chart-title">% Difference — Stage Delay &amp; Ceff (IDDQ excluded)</div>
       <div class="chart-sub" id="corr-sc-pct-sub"></div>
       <canvas id="corr-sc-pct" height="260"></canvas>
     </div>
@@ -1258,13 +1205,10 @@ const CHAIN_META={
   per_stage_metrics: ['acreff'],
 };
 
-// ─── Auto-derived raw/norm cell arrays ───────────────────────────────────────
+// ─── Auto-derived raw cell array ─────────────────────────────────────────────
 // CHAIN_CELLS holds per-stage values exactly as HSPICE .measure reports them.
-// CHAIN_CELLS_RAW scales the scalable metrics back up by STAGES (×101) to give
-// the true ring-oscillator totals. CHAIN_CELLS_NORM divides CHAIN_CELLS_RAW
-// back down by STAGES — identical to CHAIN_CELLS for this dataset, but the
-// pipeline is explicit and works correctly for future datasets whose HSPICE
-// .measure does NOT already divide by STAGES.
+// CHAIN_CELLS_RAW scales scalable metrics back up by STAGES (×101) to give
+// the true full-ring totals before HSPICE internal division.
 function scaleChainCell(c, factor){
   const sm=CHAIN_META.scalable_metrics;
   const out={label:c.label};
@@ -1300,13 +1244,11 @@ const CHAIN_CELLS=[
 
 const CHAIN_COLORS=['#00d4ff','#00ff9f','#ffe93e','#ff6b35','#ff2d78','#bd00ff','#3ee8ff'];
 
-// Derived datasets — always recomputed from CHAIN_CELLS + CHAIN_META
-const CHAIN_CELLS_RAW  = CHAIN_CELLS.map(c=>scaleChainCell(c, CHAIN_META.stages));
-const CHAIN_CELLS_NORM = CHAIN_CELLS_RAW.map(c=>scaleChainCell(c, 1/CHAIN_META.stages));
+// Derived raw dataset — always recomputed from CHAIN_CELLS + CHAIN_META
+const CHAIN_CELLS_RAW = CHAIN_CELLS.map(c=>scaleChainCell(c, CHAIN_META.stages));
 
 let chainRawChartsBuilt=false;
 let chainChartsBuilt=false;
-let chainNormChartsBuilt=false;
 
 // ─── Shared bar-chart options factory ────────────────────────────────────────
 function chainBarOpts(yLabel){
@@ -1436,74 +1378,12 @@ function buildChainView(){
     options:chainBarOpts('IDDQ/stage (nA) [\u00f7STAGES]')});
 }
 
-// ─── ④ Normalized ÷STAGES (CHAIN_CELLS_RAW ÷ STAGES = single-invertor equiv) ──
-function buildChainNormView(){
-  const m=CHAIN_META;
-  const n=m.stages;
-  // CHAIN_CELLS_NORM = CHAIN_CELLS_RAW / STAGES (auto-computed at startup)
-  document.getElementById('chain-norm-conditions').textContent=
-    chainCondStr()+` \u00b7 scalable metrics \u00f7${n} (single-invertor equivalent)`;
-  document.getElementById('chain-norm-divisor-title').textContent=n;
-  document.getElementById('chain-norm-divisor-chart-title').textContent=n;
-  document.getElementById('chain-norm-stages-note').textContent=`STAGES\u202f=\u202f${n}`;
-  document.getElementById('chain-norm-sub-delay').textContent=
-    `Norm. stage delay (ps) = raw_ring_delay \u00f7 ${n} \u00b7 VDD\u202f=\u202f${m.vdd} \u00b7 ${m.corner} \u00b7 ${m.technology}`;
-  document.getElementById('chain-norm-sub-ceff').textContent=
-    `Norm. Ceff (fF) = raw_ceff \u00f7 ${n} \u00b7 ${m.vt_flavor} \u00b7 ${m.technology}`;
-  document.getElementById('chain-norm-sub-acreff').textContent=
-    `ACReff (K\u03a9) \u2014 intrinsic V/I ratio, not divided \u00b7 ${m.vt_flavor} \u00b7 VDD\u202f=\u202f${m.vdd}`;
-  document.getElementById('chain-norm-sub-iddq').textContent=
-    `Norm. IDDQ (nA) = raw_iddq \u00f7 ${n} \u00b7 ${m.vt_flavor} \u00b7 VDD\u202f=\u202f${m.vdd} \u00b7 ${m.corner}`;
-
-  const tbody=document.getElementById('chain-norm-tbody');
-  const maxSD=Math.max(...CHAIN_CELLS_NORM.map(c=>c.stage_delay));
-  tbody.innerHTML=CHAIN_CELLS_NORM.map((c,i)=>`
-    <tr>
-      <td><span class="chip chip7">${c.label}</span></td>
-      <td>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span class="mono">${c.stage_delay.toFixed(5)}</span>
-          <div class="bar-track"><div class="bar-fill" style="width:${(c.stage_delay/maxSD*100).toFixed(1)}%;background:${CHAIN_COLORS[i]}"></div></div>
-        </div>
-      </td>
-      <td class="mono">${c.ceff.toFixed(5)}</td>
-      <td class="mono">${c.acreff.toFixed(5)}</td>
-      <td class="mono">${c.iddq.toFixed(5)}</td>
-    </tr>`).join('');
-
-  if(chainNormChartsBuilt) return;
-  chainNormChartsBuilt=true;
-
-  const labels=CHAIN_CELLS_NORM.map(c=>c.label);
-  const colors=CHAIN_COLORS;
-
-  new Chart(document.getElementById('chain-norm-delay'),{type:'bar',
-    data:{labels,datasets:[{label:`Norm. Stage Delay (ps) [raw\u202f\u00f7\u202f${n}]`,data:CHAIN_CELLS_NORM.map(c=>c.stage_delay),
-      backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:4}]},
-    options:chainBarOpts(`Norm. Stage Delay (ps) [raw\u202f\u00f7\u202f${n}]`)});
-
-  new Chart(document.getElementById('chain-norm-ceff'),{type:'bar',
-    data:{labels,datasets:[{label:`Norm. Ceff (fF) [raw\u202f\u00f7\u202f${n}]`,data:CHAIN_CELLS_NORM.map(c=>c.ceff),
-      backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:4}]},
-    options:chainBarOpts(`Norm. Ceff (fF) [raw\u202f\u00f7\u202f${n}]`)});
-
-  new Chart(document.getElementById('chain-norm-acreff'),{type:'bar',
-    data:{labels,datasets:[{label:'ACReff (K\u03a9) [intrinsic \u2014 not divided]',data:CHAIN_CELLS_NORM.map(c=>c.acreff),
-      backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:4}]},
-    options:chainBarOpts('ACReff (K\u03a9) [intrinsic \u2014 not divided]')});
-
-  new Chart(document.getElementById('chain-norm-iddq'),{type:'bar',
-    data:{labels,datasets:[{label:`Norm. IDDQ (nA) [raw\u202f\u00f7\u202f${n}]`,data:CHAIN_CELLS_NORM.map(c=>c.iddq),
-      backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:4}]},
-    options:chainBarOpts(`Norm. IDDQ (nA) [raw\u202f\u00f7\u202f${n}]`)});
-}
-
 // ═══════════════════════════════════════════════════════════════════
-// COMPARISON VIEW — Single INV (VDD sweep) vs Chain Normalized @ 0.70V
+// COMPARISON VIEW — Single INV (VDD sweep) vs Chain Per-Stage @ 0.70V
 // getCompVddIdx() finds the VDD array index matching CHAIN_META.vdd
 // automatically — works for any future chain VDD value.
 // getCorrPairs() maps chain cell labels to their single-INV equivalents.
-// Chain values come from CHAIN_CELLS_NORM (raw÷STAGES) — no /n in charts.
+// Chain values come from CHAIN_CELLS (per-stage as reported by HSPICE).
 // ═══════════════════════════════════════════════════════════════════
 let corrChartsBuilt=false;
 
@@ -1540,25 +1420,25 @@ function buildCorrView(){
   const vddLabel=VDD[vi]+'V';
   const sm=SINGLE_META, cm=CHAIN_META;
   const pairs=getCorrPairs();
-  // Use CHAIN_CELLS_NORM values — already per-invertor-equivalent, no /n needed
-  const normMap=Object.fromEntries(CHAIN_CELLS_NORM.map(c=>[c.label,c]));
+  // Use CHAIN_CELLS directly — per-stage values as reported by HSPICE
+  const chainMap=Object.fromEntries(CHAIN_CELLS.map(c=>[c.label,c]));
 
   // subtitle
   document.getElementById('corr-subtitle').textContent=
     `Single INV: ${sm.simulator} \u00b7 ${sm.technology} ${sm.vt_flavor} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp} \u00b7 VDD\u202f=\u202f${vddLabel}`+
-    `   \u2016   Chain Norm \u00f7${cm.stages}: ${cm.simulator} \u00b7 ${cm.technology} (v0.6SB2) \u00b7 ${cm.vt_flavor} \u00b7 ${cm.corner} \u00b7 T\u202f=\u202f${cm.temp} \u00b7 VDD\u202f=\u202f${cm.vdd}`;
+    `   \u2016   Chain Per-Stage: ${cm.simulator} \u00b7 ${cm.technology} (v0.6SB2) \u00b7 ${cm.vt_flavor} \u00b7 ${cm.corner} \u00b7 T\u202f=\u202f${cm.temp} \u00b7 VDD\u202f=\u202f${cm.vdd}`;
 
   // bar/scatter chart subtitles
-  const barSub=`VDD\u202f=\u202f${vddLabel} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp} \u00b7 Cyan\u202f=\u202fSingle INV ${sm.technology} (v0.6SB) \u00b7 Orange\u202f=\u202fChain Norm \u00f7${cm.stages} ${cm.technology} (v0.6SB2)`;
-  const scSub =`X\u202f=\u202fSingle INV v0.6SB (${sm.technology}) \u00b7 Y\u202f=\u202fChain Norm \u00f7${cm.stages} v0.6SB2 (${cm.technology}) \u00b7 VDD\u202f=\u202f${vddLabel} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp}`;
-  const iddqBarSub=`\u26a0 Not directly comparable \u2014 Single\u202f=\u202fDC leakage FIND AT=0ps \u00b7 Chain Norm\u202f=\u202fper-stage dynamic current in oscillating ring \u00b7 VDD\u202f=\u202f${vddLabel}`;
-  const iddqScSub =`\u26a0 Different quantities: X\u202f=\u202fsingle-cell DC leakage (nA) \u00b7 Y\u202f=\u202foscillating chain per-stage dynamic current (nA) \u00b7 shown for reference only`;
+  const barSub=`VDD\u202f=\u202f${vddLabel} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp} \u00b7 Cyan\u202f=\u202fSingle INV (v0.6SB) \u00b7 Orange\u202f=\u202fChain Per-Stage (v0.6SB2)`;
+  const scSub =`X\u202f=\u202fSingle INV (v0.6SB) \u00b7 Y\u202f=\u202fChain Per-Stage (v0.6SB2) \u00b7 VDD\u202f=\u202f${vddLabel} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp}`;
+  const iddqBarSub=`\u26a0 Not directly comparable \u2014 Single\u202f=\u202fDC leakage (FIND AT=0ps) \u00b7 Chain\u202f=\u202fper-stage dynamic current in oscillating ring \u00b7 VDD\u202f=\u202f${vddLabel}`;
+  const iddqScSub =`\u26a0 Different quantities: X\u202f=\u202fsingle-cell DC leakage (nA) \u00b7 Y\u202f=\u202fchain per-stage dynamic current (nA) \u00b7 shown for reference only`;
   ['delay','ceff','acreff'].forEach(k=>document.getElementById('corr-bar-'+k+'-sub').textContent=barSub);
   document.getElementById('corr-bar-iddq-sub').textContent=iddqBarSub;
   ['delay','ceff'].forEach(k=>document.getElementById('corr-sc-'+k+'-sub').textContent=scSub);
   document.getElementById('corr-sc-iddq-sub').textContent=iddqScSub;
   document.getElementById('corr-sc-pct-sub').textContent=
-    `Stage Delay & Ceff only \u2014 IDDQ excluded (not comparable) \u00b7 Chain Norm \u00f7${cm.stages} v0.6SB2 vs Single INV v0.6SB \u00b7 VDD\u202f=\u202f${vddLabel} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp}`;
+    `Stage Delay & Ceff only \u2014 IDDQ excluded (not comparable) \u00b7 Chain Per-Stage (v0.6SB2) vs Single INV (v0.6SB) \u00b7 VDD\u202f=\u202f${vddLabel} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp}`;
 
   // ── Delta table ──
   const dPct=(a,b)=>{
@@ -1568,7 +1448,7 @@ function buildCorrView(){
   };
   document.getElementById('corr-tbody').innerHTML=pairs.map(p=>{
     const s=p.singleCell;
-    const cn=normMap[p.chainLabel];
+    const cn=chainMap[p.chainLabel];
     const sd_s=s.stage_delay[vi];
     const sd_c=cn.stage_delay;
     const iq_s=s.iddq[vi]*1e9;
@@ -1630,7 +1510,7 @@ function buildCorrView(){
       x:{ticks:{color:'#7a85a0',font:{size:10}},grid:{color:'#1c2030'},
          title:{display:true,text:xLabel+` \u2014 Single INV ${sm.technology} (v0.6SB) @ ${vddLabel}`,color:'#7a85a0',font:{size:10}}},
       y:{ticks:{color:'#7a85a0',font:{size:10}},grid:{color:'#1c2030'},
-         title:{display:true,text:yLabel+` \u2014 Chain Norm \u00f7${cm.stages} ${cm.technology} (v0.6SB2) @ ${cm.vdd}`,color:'#7a85a0',font:{size:10}}}
+         title:{display:true,text:yLabel+` \u2014 Chain Per-Stage ${cm.technology} (v0.6SB2) @ ${cm.vdd}`,color:'#7a85a0',font:{size:10}}}
     }
   });
 
@@ -1646,20 +1526,20 @@ function buildCorrView(){
     {label:`Single INV v0.6SB (${sm.technology}) \u2014 Stage Delay (ps) @ ${vddLabel}`,
      data:pairs.map(p=>p.singleCell.stage_delay[vi]),
      backgroundColor:C_S+'99',borderColor:C_S,borderWidth:2,borderRadius:4},
-    {label:`Chain Norm \u00f7${cm.stages} v0.6SB2 (${cm.technology}) \u2014 Stage Delay (ps) @ ${cm.vdd}`,
-     data:pairs.map(p=>normMap[p.chainLabel].stage_delay),
+    {label:`Chain Per-Stage v0.6SB2 (${cm.technology}) \u2014 Stage Delay (ps) @ ${cm.vdd}`,
+     data:pairs.map(p=>chainMap[p.chainLabel].stage_delay),
      backgroundColor:C_C+'99',borderColor:C_C,borderWidth:2,borderRadius:4}
   ]},options:grpOpts('Stage Delay (ps)')});
 
   // ── BAR: IDDQ — shown with warning; different circuit types ──
   const iddqGrpOpts=grpOpts('IDDQ (nA) \u2014 \u26a0 different circuits');
-  iddqGrpOpts.plugins.tooltip.callbacks.afterBody=()=>['\u26a0 Single = DC leakage AT=0ps','\u26a0 Chain Norm = dynamic per-stage current'];
+  iddqGrpOpts.plugins.tooltip.callbacks.afterBody=()=>['\u26a0 Single = DC leakage AT=0ps','\u26a0 Chain = per-stage dynamic current'];
   new Chart(document.getElementById('corr-bar-iddq'),{type:'bar',data:{labels,datasets:[
     {label:`Single INV DC leakage (nA) @ ${vddLabel} \u2014 FIND AT=0ps`,
      data:pairs.map(p=>p.singleCell.iddq[vi]*1e9),
      backgroundColor:C_S+'55',borderColor:C_S+'88',borderWidth:2,borderRadius:4,borderDash:[4,4]},
-    {label:`Chain Norm \u00f7${cm.stages} dynamic/stage (nA) @ ${cm.vdd} \u2014 oscillating ring`,
-     data:pairs.map(p=>normMap[p.chainLabel].iddq),
+    {label:`Chain per-stage dynamic current (nA) @ ${cm.vdd}`,
+     data:pairs.map(p=>chainMap[p.chainLabel].iddq),
      backgroundColor:C_C+'55',borderColor:C_C+'88',borderWidth:2,borderRadius:4,borderDash:[4,4]}
   ]},options:iddqGrpOpts});
 
@@ -1668,8 +1548,8 @@ function buildCorrView(){
     {label:`Single INV ${sm.technology} \u2014 ACCeff (fF) @ ${vddLabel}`,
      data:pairs.map(p=>p.singleCell.acceff[vi]*1e15),
      backgroundColor:C_S+'99',borderColor:C_S,borderWidth:2,borderRadius:4},
-    {label:`Chain Norm \u00f7${cm.stages} ${cm.technology} \u2014 Ceff (fF) @ ${cm.vdd}`,
-     data:pairs.map(p=>normMap[p.chainLabel].ceff),
+    {label:`Chain Per-Stage ${cm.technology} \u2014 Ceff (fF) @ ${cm.vdd}`,
+     data:pairs.map(p=>chainMap[p.chainLabel].ceff),
      backgroundColor:C_C+'99',borderColor:C_C,borderWidth:2,borderRadius:4}
   ]},options:grpOpts('Capacitance (fF)')});
 
@@ -1678,8 +1558,8 @@ function buildCorrView(){
     {label:`Single INV ${sm.technology} \u2014 ACReff (\u03a9) @ ${vddLabel}`,
      data:pairs.map(p=>p.singleCell.acreff[vi]),
      backgroundColor:C_S+'99',borderColor:C_S,borderWidth:2,borderRadius:4,yAxisID:'yL'},
-    {label:`Chain Norm \u00f7${cm.stages} ${cm.technology} \u2014 ACReff (K\u03a9) @ ${cm.vdd}`,
-     data:pairs.map(p=>normMap[p.chainLabel].acreff),
+    {label:`Chain Per-Stage ${cm.technology} \u2014 ACReff (K\u03a9) @ ${cm.vdd}`,
+     data:pairs.map(p=>chainMap[p.chainLabel].acreff),
      backgroundColor:C_C+'99',borderColor:C_C,borderWidth:2,borderRadius:4,yAxisID:'yR'}
   ]},options:{responsive:true,animation:false,
     plugins:{
@@ -1693,16 +1573,16 @@ function buildCorrView(){
       yL:{position:'left',ticks:{color:C_S,font:{size:10}},grid:{color:'#1c2030'},
           title:{display:true,text:`Single INV ACReff (\u03a9) \u00b7 ${sm.technology} @ ${vddLabel}`,color:C_S,font:{size:10}}},
       yR:{position:'right',ticks:{color:C_C,font:{size:10}},grid:{drawOnChartArea:false},
-          title:{display:true,text:`Chain Norm \u00f7${cm.stages} ACReff (K\u03a9) \u00b7 ${cm.technology} @ ${cm.vdd}`,color:C_C,font:{size:10}}}
+          title:{display:true,text:`Chain Per-Stage ACReff (K\u03a9) \u00b7 ${cm.technology} @ ${cm.vdd}`,color:C_C,font:{size:10}}}
     }}});
 
   // ── SCATTER: Stage Delay ──
   const sdPts=pairs.map(p=>({
-    x:p.singleCell.stage_delay[vi], y:normMap[p.chainLabel].stage_delay, label:p.chainLabel
+    x:p.singleCell.stage_delay[vi], y:chainMap[p.chainLabel].stage_delay, label:p.chainLabel
   }));
   const sdOpts=scOpts('Stage Delay (ps)','Stage Delay (ps)');
   sdOpts.plugins.tooltip.callbacks.label=i=>i.dataset.label==='1:1 ref'?null:
-    `${i.raw.label}: single=${i.raw.x.toFixed(4)} ps, chain norm=${i.raw.y.toFixed(5)} ps`;
+    `${i.raw.label}: single=${i.raw.x.toFixed(4)} ps, chain per-stage=${i.raw.y.toFixed(4)} ps`;
   new Chart(document.getElementById('corr-sc-delay'),{type:'scatter',data:{datasets:[
     {label:`Cells \u00b7 VDD=${vddLabel}`,data:sdPts,
      backgroundColor:pairs.map((_,i)=>CHAIN_COLORS[i]+'cc'),
@@ -1713,11 +1593,11 @@ function buildCorrView(){
 
   // ── SCATTER: IDDQ ──
   const iqPts=pairs.map(p=>({
-    x:p.singleCell.iddq[vi]*1e9, y:normMap[p.chainLabel].iddq, label:p.chainLabel
+    x:p.singleCell.iddq[vi]*1e9, y:chainMap[p.chainLabel].iddq, label:p.chainLabel
   }));
   const iqOpts=scOpts('IDDQ (nA)','IDDQ (nA)');
   iqOpts.plugins.tooltip.callbacks.label=i=>i.dataset.label==='1:1 ref'?null:
-    `${i.raw.label}: single DC leakage=${i.raw.x.toFixed(4)} nA, chain norm dynamic=${i.raw.y.toFixed(5)} nA`;
+    `${i.raw.label}: single DC leakage=${i.raw.x.toFixed(4)} nA, chain dynamic/stage=${i.raw.y.toFixed(4)} nA`;
   new Chart(document.getElementById('corr-sc-iddq'),{type:'scatter',data:{datasets:[
     {label:`Cells \u00b7 VDD=${vddLabel}`,data:iqPts,
      backgroundColor:pairs.map((_,i)=>CHAIN_COLORS[i]+'cc'),
@@ -1728,11 +1608,11 @@ function buildCorrView(){
 
   // ── SCATTER: Ceff / ACCeff ──
   const cfPts=pairs.map(p=>({
-    x:p.singleCell.acceff[vi]*1e15, y:normMap[p.chainLabel].ceff, label:p.chainLabel
+    x:p.singleCell.acceff[vi]*1e15, y:chainMap[p.chainLabel].ceff, label:p.chainLabel
   }));
   const cfOpts=scOpts('ACCeff (fF)','Norm. Ceff (fF)');
   cfOpts.plugins.tooltip.callbacks.label=i=>i.dataset.label==='1:1 ref'?null:
-    `${i.raw.label}: single ACCeff=${i.raw.x.toFixed(4)} fF, chain norm Ceff=${i.raw.y.toFixed(5)} fF`;
+    `${i.raw.label}: single ACCeff=${i.raw.x.toFixed(4)} fF, chain Ceff=${i.raw.y.toFixed(4)} fF`;
   new Chart(document.getElementById('corr-sc-ceff'),{type:'scatter',data:{datasets:[
     {label:`Cells \u00b7 VDD=${vddLabel}`,data:cfPts,
      backgroundColor:pairs.map((_,i)=>CHAIN_COLORS[i]+'cc'),
@@ -1743,10 +1623,10 @@ function buildCorrView(){
 
   // ── % Difference bar — Stage Delay & Ceff only; IDDQ excluded (not comparable) ──
   const pctMetrics=[
-    {label:`Stage Delay % diff \u00b7 Chain Norm v0.6SB2 vs Single INV v0.6SB \u00b7 VDD=${vddLabel}`, col:'#00d4ff',
-     fn:p=>((normMap[p.chainLabel].stage_delay - p.singleCell.stage_delay[vi])/p.singleCell.stage_delay[vi]*100)},
-    {label:`Ceff/ACCeff % diff \u00b7 Chain Norm v0.6SB2 vs Single INV v0.6SB \u00b7 VDD=${vddLabel}`, col:'#00ff9f',
-     fn:p=>((normMap[p.chainLabel].ceff - p.singleCell.acceff[vi]*1e15)/(p.singleCell.acceff[vi]*1e15)*100)}
+    {label:`Stage Delay % diff \u00b7 Chain Per-Stage vs Single INV \u00b7 VDD=${vddLabel}`, col:'#00d4ff',
+     fn:p=>((chainMap[p.chainLabel].stage_delay - p.singleCell.stage_delay[vi])/p.singleCell.stage_delay[vi]*100)},
+    {label:`Ceff % diff \u00b7 Chain Per-Stage vs Single INV \u00b7 VDD=${vddLabel}`, col:'#00ff9f',
+     fn:p=>((chainMap[p.chainLabel].ceff - p.singleCell.acceff[vi]*1e15)/(p.singleCell.acceff[vi]*1e15)*100)}
   ];
   new Chart(document.getElementById('corr-sc-pct'),{type:'bar',data:{labels,datasets:
     pctMetrics.map(mk=>({
@@ -1760,7 +1640,7 @@ function buildCorrView(){
       tooltip:{mode:'index',intersect:false,
         callbacks:{
           title:i=>`Cell: ${i[0].label} \u00b7 VDD\u202f=\u202f${vddLabel} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp}`,
-          label:i=>`${i.dataset.label}: ${i.raw>0?'+':''}${i.raw.toFixed(2)}% (Chain Norm \u00f7${cm.stages} v0.6SB2 vs Single INV v0.6SB)`
+          label:i=>`${i.dataset.label}: ${i.raw>0?'+':''}${i.raw.toFixed(2)}% (Chain Per-Stage v0.6SB2 vs Single INV v0.6SB)`
         }}
     },
     scales:{
@@ -1769,14 +1649,14 @@ function buildCorrView(){
       y:{ticks:{color:'#7a85a0',font:{size:10},callback:v=>v.toFixed(1)+'%'},
          grid:{color:'#1c2030'},
          title:{display:true,
-           text:`% diff: (Chain Norm \u00f7${cm.stages} v0.6SB2 \u2212 Single INV v0.6SB) / Single INV \u00d7 100 \u00b7 VDD=${vddLabel}`,
+           text:`% diff: (Chain Per-Stage v0.6SB2 \u2212 Single INV v0.6SB) / Single INV \u00d7 100 \u00b7 VDD=${vddLabel}`,
            color:'#7a85a0',font:{size:10}}}
     }}});
 }
 
 function switchDataset(val){
   // Hide all views
-  ['view-single','view-chain-raw','view-chain','view-chain-norm','view-corr']
+  ['view-single','view-chain-raw','view-chain','view-corr']
     .forEach(id=>document.getElementById(id).style.display='none');
 
   const m=CHAIN_META, sm=SINGLE_META;
@@ -1809,27 +1689,13 @@ function switchDataset(val){
       <span class="badge" style="border-color:var(--accent2);color:var(--accent2)">per-stage (HSPICE \u00f7STAGES)</span>`;
     buildChainView();
 
-  } else if(val==='chain_norm'){
-    document.getElementById('view-chain-norm').style.display='';
-    document.getElementById('header-subtitle').textContent=
-      `${m.simulator} \u00b7 ${m.technology} \u00b7 ${m.corner} Corner \u00b7 T\u202f=\u202f${m.temp} \u00b7 Normalized \u00f7${m.stages} (single-invertor equivalent)`;
-    document.getElementById('header-badges').innerHTML=`
-      <span class="badge">${CHAIN_CELLS.length} cells</span>
-      <span class="badge">${m.vt_flavor}</span>
-      <span class="badge">${m.stages}-stage chain</span>
-      <span class="badge">VDD\u202f=\u202f${m.vdd}</span>
-      <span class="badge">T\u202f=\u202f${m.temp} \u00b7 ${m.corner}</span>
-      <span class="badge">${m.technology}</span>
-      <span class="badge" style="border-color:#00ff9f;color:#00ff9f">scalable metrics \u00f7${m.stages}</span>`;
-    buildChainNormView();
-
   } else if(val==='corr'){
     document.getElementById('view-corr').style.display='';
     document.getElementById('header-subtitle').textContent=
-      `${sm.technology} ${sm.vt_flavor} Single INV (v0.6SB)  vs  ${m.technology} Chain Norm \u00f7${m.stages} (v0.6SB2) \u00b7 VDD\u202f=\u202f${m.vdd} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp}`;
+      `${sm.technology} ${sm.vt_flavor} Single INV (v0.6SB) vs Chain Per-Stage (v0.6SB2) \u00b7 VDD\u202f=\u202f${m.vdd} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp}`;
     document.getElementById('header-badges').innerHTML=`
       <span class="badge" style="border-color:#00d4ff;color:#00d4ff">Single INV \u00b7 ${sm.technology} (v0.6SB)</span>
-      <span class="badge" style="border-color:#ff6b35;color:#ff6b35">Chain Norm \u00f7${m.stages} \u00b7 ${m.technology} (v0.6SB2)</span>
+      <span class="badge" style="border-color:#ff6b35;color:#ff6b35">Chain Per-Stage \u00b7 ${m.technology} (v0.6SB2)</span>
       <span class="badge">VDD\u202f=\u202f${m.vdd}</span>
       <span class="badge">${sm.corner} \u00b7 T\u202f=\u202f${sm.temp}</span>
       <span class="badge">${getCorrPairs().length} matched cells \u00b7 4 metrics</span>`;
