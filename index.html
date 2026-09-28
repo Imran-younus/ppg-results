@@ -90,6 +90,7 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
         <option value="single">Single Invertor — VDD Sweep</option>
         <option value="chain_raw">101-Stage Chain — Full Ring Results</option>
         <option value="chain">101-Stage Chain — Per Stage</option>
+        <option value="chain_norm">101-Stage Chain — Normalised to Single Invertor (÷STAGES)</option>
         <option value="corr">Comparison — Single INV vs Chain Per Stage</option>
       </select>
     </div>
@@ -320,6 +321,59 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
 </div><!-- end #view-chain -->
 
 <!-- ═══ CHAIN NORMALIZED VIEW ═══ -->
+<div id="view-chain-norm" style="display:none">
+<section>
+  <div class="section-title"><span class="bar"></span>④ 101-Stage Chain — Normalised to Single Invertor (÷STAGES)</div>
+  <p style="font-size:12px;color:var(--muted);margin-bottom:10px;" id="chain-norm-conditions"></p>
+  <div style="background:var(--surface2);border:1px solid #00ff9f55;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.7">
+    <span style="color:#00ff9f">✦ Per-invertor normalisation.</span>
+    Raw ring-oscillator totals are divided by <code id="chain-norm-stages-note"></code> to yield a single-invertor equivalent.
+    This is derived automatically: <code>norm_value = raw_total / STAGES</code>.
+    ACReff is an intrinsic V/I ratio and is <strong>not scaled</strong> — it is identical across all views.
+    <br>Formula: <code>norm_delay = ring_delay / STAGES</code> &nbsp;|&nbsp; <code>norm_ceff = ring_ceff / STAGES</code> &nbsp;|&nbsp; <code>norm_iddq = ring_iddq / STAGES</code>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Cell</th>
+          <th>Delay/invertor (ps) [ring_total ÷ STAGES]</th>
+          <th>Ceff/invertor (fF) [ring_total ÷ STAGES]</th>
+          <th>ACReff (KΩ) [intrinsic — unchanged]</th>
+          <th>IDDQ/invertor (nA) [ring_total ÷ STAGES]</th>
+        </tr>
+      </thead>
+      <tbody id="chain-norm-tbody"></tbody>
+    </table>
+  </div>
+</section>
+<section>
+  <div class="section-title"><span class="bar"></span>Single-Invertor Normalised Metrics — Bar Charts</div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">Delay/invertor (ps) — ring total ÷ STAGES</div>
+      <div class="chart-sub" id="chain-norm-sub-delay"></div>
+      <canvas id="chain-norm-delay" height="220"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Ceff/invertor (fF) — ring total ÷ STAGES</div>
+      <div class="chart-sub" id="chain-norm-sub-ceff"></div>
+      <canvas id="chain-norm-ceff" height="220"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">ACReff (KΩ) — intrinsic ratio, not scaled</div>
+      <div class="chart-sub" id="chain-norm-sub-acreff"></div>
+      <canvas id="chain-norm-acreff" height="220"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">IDDQ/invertor (nA) — ring total ÷ STAGES</div>
+      <div class="chart-sub" id="chain-norm-sub-iddq"></div>
+      <canvas id="chain-norm-iddq" height="220"></canvas>
+    </div>
+  </div>
+</section>
+</div><!-- end #view-chain-norm -->
+
 <!-- ═══ COMPARISON VIEW ═══ -->
 <div id="view-corr" style="display:none">
 <section>
@@ -1247,8 +1301,15 @@ const CHAIN_COLORS=['#00d4ff','#00ff9f','#ffe93e','#ff6b35','#ff2d78','#bd00ff',
 // Derived raw dataset — always recomputed from CHAIN_CELLS + CHAIN_META
 const CHAIN_CELLS_RAW = CHAIN_CELLS.map(c=>scaleChainCell(c, CHAIN_META.stages));
 
+// Derived normalised dataset — raw ring totals ÷ STAGES → per-invertor equivalent.
+// Driven entirely by CHAIN_META.stages so new datasets with different chain lengths
+// normalise automatically. Numerically equals CHAIN_CELLS (per-stage), but computed
+// from the raw totals to make the ÷STAGES derivation explicit and traceable.
+const CHAIN_CELLS_NORM = CHAIN_CELLS_RAW.map(c=>scaleChainCell(c, 1/CHAIN_META.stages));
+
 let chainRawChartsBuilt=false;
 let chainChartsBuilt=false;
+let chainNormChartsBuilt=false;
 
 // ─── Shared bar-chart options factory ────────────────────────────────────────
 function chainBarOpts(yLabel){
@@ -1376,6 +1437,68 @@ function buildChainView(){
     data:{labels,datasets:[{label:'IDDQ/stage (nA) [\u00f7STAGES]',data:CHAIN_CELLS.map(c=>c.iddq),
       backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:4}]},
     options:chainBarOpts('IDDQ/stage (nA) [\u00f7STAGES]')});
+}
+
+// ─── ④ Normalised to single invertor (CHAIN_CELLS_RAW ÷ STAGES) ──────────────
+// CHAIN_CELLS_NORM is derived automatically from CHAIN_CELLS_RAW and CHAIN_META.stages.
+// Adding a new dataset with different STAGES requires only updating CHAIN_META.stages
+// and CHAIN_CELLS — CHAIN_CELLS_RAW and CHAIN_CELLS_NORM recompute themselves.
+function buildChainNormView(){
+  const m=CHAIN_META;
+  const n=m.stages;
+  document.getElementById('chain-norm-conditions').textContent=
+    chainCondStr()+` \u00b7 raw ring totals \u00f7${n} (per-invertor normalised)`;
+  document.getElementById('chain-norm-stages-note').textContent=`STAGES\u202f=\u202f${n}`;
+  document.getElementById('chain-norm-sub-delay').textContent=
+    `Delay/invertor (ps) = ring_delay \u00f7 ${n} \u00b7 VDD\u202f=\u202f${m.vdd} \u00b7 ${m.corner} \u00b7 ${m.technology}`;
+  document.getElementById('chain-norm-sub-ceff').textContent=
+    `Ceff/invertor (fF) = ring_ceff \u00f7 ${n} \u00b7 ${m.vt_flavor} \u00b7 ${m.technology}`;
+  document.getElementById('chain-norm-sub-acreff').textContent=
+    `ACReff (K\u03a9) \u2014 intrinsic V/I ratio, not scaled \u00b7 ${m.vt_flavor} \u00b7 VDD\u202f=\u202f${m.vdd}`;
+  document.getElementById('chain-norm-sub-iddq').textContent=
+    `IDDQ/invertor (nA) = ring_iddq \u00f7 ${n} \u00b7 ${m.vt_flavor} \u00b7 VDD\u202f=\u202f${m.vdd} \u00b7 ${m.corner}`;
+
+  const tbody=document.getElementById('chain-norm-tbody');
+  const maxSD=Math.max(...CHAIN_CELLS_NORM.map(c=>c.stage_delay));
+  tbody.innerHTML=CHAIN_CELLS_NORM.map((c,i)=>`
+    <tr>
+      <td><span class="chip chip7">${c.label}</span></td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="mono">${c.stage_delay.toFixed(4)}</span>
+          <div class="bar-track"><div class="bar-fill" style="width:${(c.stage_delay/maxSD*100).toFixed(1)}%;background:${CHAIN_COLORS[i]}"></div></div>
+        </div>
+      </td>
+      <td class="mono">${c.ceff.toFixed(4)}</td>
+      <td class="mono">${c.acreff.toFixed(5)}</td>
+      <td class="mono">${c.iddq.toFixed(4)}</td>
+    </tr>`).join('');
+
+  if(chainNormChartsBuilt) return;
+  chainNormChartsBuilt=true;
+
+  const labels=CHAIN_CELLS_NORM.map(c=>c.label);
+  const colors=CHAIN_COLORS;
+
+  new Chart(document.getElementById('chain-norm-delay'),{type:'bar',
+    data:{labels,datasets:[{label:`Delay/invertor (ps) [\u00f7${n}]`,data:CHAIN_CELLS_NORM.map(c=>c.stage_delay),
+      backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:4}]},
+    options:chainBarOpts(`Delay/invertor (ps) [\u00f7${n}]`)});
+
+  new Chart(document.getElementById('chain-norm-ceff'),{type:'bar',
+    data:{labels,datasets:[{label:`Ceff/invertor (fF) [\u00f7${n}]`,data:CHAIN_CELLS_NORM.map(c=>c.ceff),
+      backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:4}]},
+    options:chainBarOpts(`Ceff/invertor (fF) [\u00f7${n}]`)});
+
+  new Chart(document.getElementById('chain-norm-acreff'),{type:'bar',
+    data:{labels,datasets:[{label:'ACReff (K\u03a9) [intrinsic \u2014 not scaled]',data:CHAIN_CELLS_NORM.map(c=>c.acreff),
+      backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:4}]},
+    options:chainBarOpts('ACReff (K\u03a9) [intrinsic \u2014 not scaled]')});
+
+  new Chart(document.getElementById('chain-norm-iddq'),{type:'bar',
+    data:{labels,datasets:[{label:`IDDQ/invertor (nA) [\u00f7${n}]`,data:CHAIN_CELLS_NORM.map(c=>c.iddq),
+      backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:4}]},
+    options:chainBarOpts(`IDDQ/invertor (nA) [\u00f7${n}]`)});
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1656,7 +1779,7 @@ function buildCorrView(){
 
 function switchDataset(val){
   // Hide all views
-  ['view-single','view-chain-raw','view-chain','view-corr']
+  ['view-single','view-chain-raw','view-chain','view-chain-norm','view-corr']
     .forEach(id=>document.getElementById(id).style.display='none');
 
   const m=CHAIN_META, sm=SINGLE_META;
@@ -1688,6 +1811,20 @@ function switchDataset(val){
       <span class="badge">${m.technology}</span>
       <span class="badge" style="border-color:var(--accent2);color:var(--accent2)">per-stage (HSPICE \u00f7STAGES)</span>`;
     buildChainView();
+
+  } else if(val==='chain_norm'){
+    document.getElementById('view-chain-norm').style.display='';
+    document.getElementById('header-subtitle').textContent=
+      `${m.simulator} \u00b7 ${m.technology} \u00b7 ${m.corner} Corner \u00b7 T\u202f=\u202f${m.temp} \u00b7 Normalised to single invertor (\u00f7${m.stages})`;
+    document.getElementById('header-badges').innerHTML=`
+      <span class="badge">${CHAIN_CELLS.length} cells</span>
+      <span class="badge">${m.vt_flavor}</span>
+      <span class="badge">${m.stages}-stage chain</span>
+      <span class="badge">VDD\u202f=\u202f${m.vdd}</span>
+      <span class="badge">T\u202f=\u202f${m.temp} \u00b7 ${m.corner}</span>
+      <span class="badge">${m.technology}</span>
+      <span class="badge" style="border-color:#00ff9f;color:#00ff9f">ring total \u00f7${m.stages} \u2192 per-invertor</span>`;
+    buildChainNormView();
 
   } else if(val==='corr'){
     document.getElementById('view-corr').style.display='';
