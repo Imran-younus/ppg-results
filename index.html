@@ -328,14 +328,14 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
   <!-- Legend + context notes -->
   <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:20px;font-size:12px;line-height:1.8">
     <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:10px;">
-      <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#00d4ff;margin-right:6px;vertical-align:middle"></span><strong style="color:#00d4ff">Single Stage</strong> — v0.6SB2 model (Spice-260604-sandbox) · ULVT · single-cell SPICE · VDD sweep</span>
-      <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#ff6b35;margin-right:6px;vertical-align:middle"></span><strong style="color:#ff6b35">Chain Per-Stage</strong> — v0.6SB2 model (Spice-260604-sandbox) · ULVT · 101-stage chain · per-stage values as reported by HSPICE</span>
+      <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#00d4ff;margin-right:6px;vertical-align:middle"></span><strong style="color:#00d4ff">Single Stage</strong> — v0.6SB2 (Spice-260604-sandbox) · <strong style="color:#ffe93e">ULVT</strong> · single-cell SPICE · VDD sweep</span>
+      <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#ff6b35;margin-right:6px;vertical-align:middle"></span><strong style="color:#ff6b35">Chain Per-Stage</strong> — v0.6SB2 (Spice-260604-sandbox) · <strong style="color:#ffe93e">SLVT</strong> · 101-stage chain · per-stage values as reported by HSPICE</span>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:8px;color:var(--muted)">
-      <div><span style="color:#ffe93e">⚠ Stage Delay:</span> ~6% difference expected — v0.6SB2 adds dRint=−14 Ω·μm &amp; Rext=−25 Ω·μm vs v0.6SB, making chain cells slightly slower.</div>
-      <div><span style="color:#ff2d78">⚠ IDDQ — NOT directly comparable:</span> Single-INV IDDQ = DC leakage of 1 cell (FIND I AT=0 ps). Chain per-stage IDDQ = dynamic current per stage in an oscillating ring — fundamentally different quantities.</div>
-      <div><span style="color:#00ff9f">✓ Ceff / ACCeff:</span> Comparable — both derived from charge-based extraction. Small delta reflects model difference only.</div>
-      <div><span style="color:#00ff9f">✓ ACReff:</span> Units differ (single=Ω, chain=KΩ) — shown on separate axes. Ratio reflects model + circuit topology difference.</div>
+      <div><span style="color:#ffe93e">⚠ Stage Delay (~20–30% delta):</span> Both datasets use v0.6SB2 (Spice-260604-sandbox) but <strong style="color:#ff2d78">different Vt flavors — single-stage is ULVT, chain is SLVT</strong>. SLVT has higher Vt and lower leakage than ULVT → slower delay. This Vt difference is the primary cause of the observed delta.</div>
+      <div><span style="color:#ff2d78">⚠ IDDQ — NOT directly comparable:</span> Single-INV IDDQ = DC leakage of 1 cell (FIND I AT=0 ps). Chain per-stage IDDQ = dynamic current per stage in an oscillating ring — fundamentally different quantities. Additionally, ULVT vs SLVT leakage differ significantly.</div>
+      <div><span style="color:#00ff9f">✓ Ceff / ACCeff:</span> Comparable — both derived from charge-based extraction. Delta reflects ULVT vs SLVT device sizing and Vt flavor difference.</div>
+      <div><span style="color:#00ff9f">✓ ACReff:</span> Units differ (single=Ω, chain=KΩ) — shown on separate axes. Ratio reflects ULVT vs SLVT Vt flavor and circuit topology difference.</div>
     </div>
   </div>
 
@@ -370,7 +370,7 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
 
   <!-- Grouped bar charts -->
   <div class="section-title" style="margin-bottom:4px"><span class="bar"></span>Grouped Bar Charts — Single Stage vs Chain Per-Stage @ 0.70V</div>
-  <p style="font-size:11px;color:var(--muted);margin-bottom:14px;">Cyan = Single Stage (v0.6SB2) · Orange = Chain Per-Stage (v0.6SB2) · ~6% delay delta expected due to model version difference</p>
+  <p style="font-size:11px;color:var(--muted);margin-bottom:14px;">Cyan = Single Stage (ULVT) · Orange = Chain Per-Stage (SLVT) · Same model v0.6SB2 (Spice-260604-sandbox) · Delta primarily due to ULVT vs SLVT Vt flavor difference</p>
   <div class="charts-grid" style="margin-bottom:32px">
     <div class="chart-card">
       <div class="chart-title">Stage Delay (ps)</div>
@@ -396,7 +396,7 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
 
   <!-- Scatter plots -->
   <div class="section-title" style="margin-bottom:4px"><span class="bar"></span>Scatter Plots — Single Stage (X) vs Chain Per-Stage (Y) @ 0.70V</div>
-  <p style="font-size:11px;color:var(--muted);margin-bottom:16px;">Each point = one cell · Dashed line = 1:1 · Points above = chain larger · Deviation from diagonal = v0.6SB → v0.6SB2 model difference</p>
+  <p style="font-size:11px;color:var(--muted);margin-bottom:16px;">Each point = one cell · Dashed line = 1:1 · Points above = chain larger · Deviation from diagonal primarily due to ULVT (single) vs SLVT (chain) Vt flavor difference · Same model v0.6SB2 (Spice-260604-sandbox)</p>
   <div class="charts-grid">
     <div class="chart-card">
       <div class="chart-title">Stage Delay (ps)</div>
@@ -1173,7 +1173,7 @@ function renderAll(){
 
 // Single Stage VDD sweep dataset
 const SINGLE_META={
-  technology:  'v0.6SB2',
+  technology:  'v0.6SB2 (Spice-260604-sandbox)',
   simulator:   'HSPICE T-2022.06-SP2',
   vdd_range:   '0.5 V – 1.15 V',
   vdd_pts:     14,
@@ -1188,7 +1188,7 @@ const SINGLE_META={
 
 // 101-stage chain dataset
 const CHAIN_META={
-  technology:  'v0.6SB2',
+  technology:  'v0.6SB2 (Spice-260604-sandbox)',
   simulator:   'HSPICE T-2022.06-SP2',
   vdd:         '0.70 V',
   temp:        '25 °C',
@@ -1424,11 +1424,11 @@ function buildCorrView(){
   // subtitle
   document.getElementById('corr-subtitle').textContent=
     `Single Stage: ${sm.simulator} \u00b7 ${sm.technology} ${sm.vt_flavor} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp} \u00b7 VDD\u202f=\u202f${vddLabel}`+
-    `   \u2016   Chain Per-Stage: ${cm.simulator} \u00b7 ${cm.technology} (v0.6SB2) \u00b7 ${cm.vt_flavor} \u00b7 ${cm.corner} \u00b7 T\u202f=\u202f${cm.temp} \u00b7 VDD\u202f=\u202f${cm.vdd}`;
+    `   \u2016   Chain Per-Stage: ${cm.simulator} \u00b7 ${cm.technology} \u00b7 ${cm.vt_flavor} \u00b7 ${cm.corner} \u00b7 T\u202f=\u202f${cm.temp} \u00b7 VDD\u202f=\u202f${cm.vdd}`;
 
   // bar/scatter chart subtitles
-  const barSub=`VDD\u202f=\u202f${vddLabel} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp} \u00b7 Cyan\u202f=\u202fSingle Stage (v0.6SB2) \u00b7 Orange\u202f=\u202fChain Per-Stage (v0.6SB2)`;
-  const scSub =`X\u202f=\u202fSingle Stage (v0.6SB2) \u00b7 Y\u202f=\u202fChain Per-Stage (v0.6SB2) \u00b7 VDD\u202f=\u202f${vddLabel} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp}`;
+  const barSub=`VDD\u202f=\u202f${vddLabel} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp} \u00b7 Cyan\u202f=\u202fSingle Stage \u00b7 Orange\u202f=\u202fChain Per-Stage \u00b7 Both: ${sm.technology}`;
+  const scSub =`X\u202f=\u202fSingle Stage \u00b7 Y\u202f=\u202fChain Per-Stage \u00b7 Both: ${sm.technology} \u00b7 VDD\u202f=\u202f${vddLabel} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp}`;
   const iddqBarSub=`\u26a0 Not directly comparable \u2014 Single\u202f=\u202fDC leakage (FIND AT=0ps) \u00b7 Chain\u202f=\u202fper-stage dynamic current in oscillating ring \u00b7 VDD\u202f=\u202f${vddLabel}`;
   const iddqScSub =`\u26a0 Different quantities: X\u202f=\u202fsingle-cell DC leakage (nA) \u00b7 Y\u202f=\u202fchain per-stage dynamic current (nA) \u00b7 shown for reference only`;
   ['delay','ceff','acreff'].forEach(k=>document.getElementById('corr-bar-'+k+'-sub').textContent=barSub);
@@ -1436,7 +1436,7 @@ function buildCorrView(){
   ['delay','ceff'].forEach(k=>document.getElementById('corr-sc-'+k+'-sub').textContent=scSub);
   document.getElementById('corr-sc-iddq-sub').textContent=iddqScSub;
   document.getElementById('corr-sc-pct-sub').textContent=
-    `Stage Delay & Ceff only \u2014 IDDQ excluded (not comparable) \u00b7 Chain Per-Stage (v0.6SB2) vs Single Stage (v0.6SB2) \u00b7 VDD\u202f=\u202f${vddLabel} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp}`;
+    `Stage Delay & Ceff only \u2014 IDDQ excluded (not comparable) \u00b7 Both: ${sm.technology} \u00b7 VDD\u202f=\u202f${vddLabel} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp}`;
 
   // ── Delta table ──
   const dPct=(a,b)=>{
@@ -1506,9 +1506,9 @@ function buildCorrView(){
     },
     scales:{
       x:{ticks:{color:'#7a85a0',font:{size:10}},grid:{color:'#1c2030'},
-         title:{display:true,text:xLabel+` \u2014 Single Stage ${sm.technology} (v0.6SB2) @ ${vddLabel}`,color:'#7a85a0',font:{size:10}}},
-      y:{ticks:{color:'#7a85a0',font:{size:10}},grid:{color:'#1c2030'},
-         title:{display:true,text:yLabel+` \u2014 Chain Per-Stage ${cm.technology} (v0.6SB2) @ ${cm.vdd}`,color:'#7a85a0',font:{size:10}}}
+         title:{display:true,text:xLabel+` \u2014 Single Stage ${sm.technology} @ ${vddLabel}`,color:'#7a85a0',font:{size:10}}},
+       y:{ticks:{color:'#7a85a0',font:{size:10}},grid:{color:'#1c2030'},
+          title:{display:true,text:yLabel+` \u2014 Chain Per-Stage ${cm.technology} @ ${cm.vdd}`,color:'#7a85a0',font:{size:10}}}
     }
   });
 
@@ -1521,10 +1521,10 @@ function buildCorrView(){
 
   // ── BAR: Stage Delay ──
   new Chart(document.getElementById('corr-bar-delay'),{type:'bar',data:{labels,datasets:[
-    {label:`Single Stage v0.6SB2 (${sm.technology}) \u2014 Stage Delay (ps) @ ${vddLabel}`,
+    {label:`Single Stage ${sm.technology} \u2014 Stage Delay (ps) @ ${vddLabel}`,
      data:pairs.map(p=>p.singleCell.stage_delay[vi]),
      backgroundColor:C_S+'99',borderColor:C_S,borderWidth:2,borderRadius:4},
-    {label:`Chain Per-Stage v0.6SB2 (${cm.technology}) \u2014 Stage Delay (ps) @ ${cm.vdd}`,
+    {label:`Chain Per-Stage ${cm.technology} \u2014 Stage Delay (ps) @ ${cm.vdd}`,
      data:pairs.map(p=>chainMap[p.chainLabel].stage_delay),
      backgroundColor:C_C+'99',borderColor:C_C,borderWidth:2,borderRadius:4}
   ]},options:grpOpts('Stage Delay (ps)')});
@@ -1638,7 +1638,7 @@ function buildCorrView(){
       tooltip:{mode:'index',intersect:false,
         callbacks:{
           title:i=>`Cell: ${i[0].label} \u00b7 VDD\u202f=\u202f${vddLabel} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp}`,
-          label:i=>`${i.dataset.label}: ${i.raw>0?'+':''}${i.raw.toFixed(2)}% (Chain Per-Stage v0.6SB2 vs Single Stage v0.6SB2)`
+          label:i=>`${i.dataset.label}: ${i.raw>0?'+':''}${i.raw.toFixed(2)}% (Chain Per-Stage vs Single Stage \u2014 topology difference)`
         }}
     },
     scales:{
@@ -1647,7 +1647,7 @@ function buildCorrView(){
       y:{ticks:{color:'#7a85a0',font:{size:10},callback:v=>v.toFixed(1)+'%'},
          grid:{color:'#1c2030'},
          title:{display:true,
-           text:`% diff: (Chain Per-Stage v0.6SB2 \u2212 Single Stage v0.6SB2) / Single Stage \u00d7 100 \u00b7 VDD=${vddLabel}`,
+           text:`% diff: (Chain Per-Stage \u2212 Single Stage) / Single Stage \u00d7 100 \u00b7 Both: ${sm.technology} \u00b7 VDD=${vddLabel}`,
            color:'#7a85a0',font:{size:10}}}
     }}});
 }
@@ -1690,10 +1690,10 @@ function switchDataset(val){
   } else if(val==='corr'){
     document.getElementById('view-corr').style.display='';
     document.getElementById('header-subtitle').textContent=
-      `${sm.technology} ${sm.vt_flavor} Single Stage (v0.6SB2) vs Chain Per-Stage (v0.6SB2) \u00b7 VDD\u202f=\u202f${m.vdd} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp}`;
+      `${sm.technology} ${sm.vt_flavor} Single Stage vs Chain Per-Stage \u00b7 VDD\u202f=\u202f${m.vdd} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp}`;
     document.getElementById('header-badges').innerHTML=`
-      <span class="badge" style="border-color:#00d4ff;color:#00d4ff">Single Stage 00b7 ${sm.technology} (v0.6SB2)</span>
-      <span class="badge" style="border-color:#ff6b35;color:#ff6b35">Chain Per-Stage \u00b7 ${m.technology} (v0.6SB2)</span>
+      <span class="badge" style="border-color:#00d4ff;color:#00d4ff">Single Stage \u00b7 ${sm.technology}</span>
+      <span class="badge" style="border-color:#ff6b35;color:#ff6b35">Chain Per-Stage \u00b7 ${m.technology}</span>
       <span class="badge">VDD\u202f=\u202f${m.vdd}</span>
       <span class="badge">${sm.corner} \u00b7 T\u202f=\u202f${sm.temp}</span>
       <span class="badge">${getCorrPairs().length} matched cells \u00b7 4 metrics</span>`;
