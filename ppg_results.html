@@ -1,0 +1,1733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title id="page-title">PPG Delay Chain — Simulation Results</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:#0a0c14; --surface:#12151f; --surface2:#1c2030; --border:#252a3a;
+  --text:#e8eaf0; --muted:#7a85a0; --accent:#00d4ff; --accent2:#bd00ff;
+  --c6:#00d4ff; --c7:#bd00ff; --c8:#ff6b35;
+  --green:#00ff9f; --yellow:#ffe93e; --pink:#ff2d78; --orange:#ff9500;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,"Segoe UI",system-ui,sans-serif;font-size:14px;line-height:1.6;background:var(--bg);color:var(--text);}
+.page{max-width:1280px;margin:0 auto;padding:28px 20px 60px;}
+header{border-bottom:1px solid var(--border);padding-bottom:18px;margin-bottom:28px;}
+header h1{font-size:24px;font-weight:800;background:linear-gradient(90deg,#00d4ff,#bd00ff,#ff6b35);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px;}
+header p{color:var(--muted);font-size:13px;}
+.badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+.badge{border:1px solid var(--border);border-radius:20px;padding:3px 12px;font-size:11px;color:var(--muted);background:var(--surface2);}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-bottom:36px;}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;position:relative;overflow:hidden;}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.kpi.c1::before{background:linear-gradient(90deg,#00d4ff,#00ff9f);}
+.kpi.c2::before{background:linear-gradient(90deg,#ff6b35,#ffe93e);}
+.kpi.c3::before{background:linear-gradient(90deg,#bd00ff,#ff2d78);}
+.kpi.c4::before{background:linear-gradient(90deg,#ffe93e,#ff9500);}
+.kpi.c5::before{background:linear-gradient(90deg,#00ff9f,#00d4ff);}
+.kpi-label{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:6px;}
+.kpi-value{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums;}
+.kpi-sub{font-size:11px;color:var(--muted);margin-top:4px;}
+section{margin-bottom:44px;}
+.section-title{font-size:15px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:10px;}
+.section-title .bar{width:4px;height:18px;border-radius:2px;background:linear-gradient(180deg,var(--accent),var(--accent2));flex-shrink:0;}
+.controls{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
+.controls label{font-size:12px;color:var(--muted);}
+.btn{border:1px solid var(--border);background:var(--surface2);color:var(--muted);border-radius:6px;padding:5px 13px;font-size:12px;cursor:pointer;transition:all .15s;font-weight:500;}
+.btn:hover{border-color:var(--accent);color:var(--text);}
+.btn.active{color:#00d4ff;border-color:#00d4ff;background:rgba(0,212,255,.08);}
+.btn.active.p{color:#bd00ff;border-color:#bd00ff;background:rgba(189,0,255,.08);}
+.btn.active.o{color:#ff6b35;border-color:#ff6b35;background:rgba(255,107,53,.08);}
+.sep{width:1px;height:22px;background:var(--border);}
+.vdd-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:18px;}
+.vdd-pill{border:1px solid var(--border);background:var(--surface2);color:var(--muted);border-radius:20px;padding:4px 12px;font-size:12px;cursor:pointer;transition:all .15s;}
+.vdd-pill:hover{border-color:var(--yellow);color:var(--yellow);}
+.vdd-pill.active{background:var(--yellow);color:#111;border-color:var(--yellow);font-weight:700;}
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead th{background:var(--surface);font-weight:600;padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em;}
+tbody tr{border-bottom:1px solid var(--border);}
+tbody tr:last-child{border-bottom:none;}
+tbody tr:hover{background:rgba(0,212,255,.04);}
+td{padding:9px 12px;white-space:nowrap;}
+.chip{display:inline-block;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;}
+.chip6{background:rgba(0,212,255,.15);color:#00d4ff;}
+.chip7{background:rgba(189,0,255,.15);color:#bd00ff;}
+.chip8{background:rgba(255,107,53,.15);color:#ff6b35;}
+.bar-track{flex:1;background:var(--surface2);border-radius:3px;height:6px;min-width:80px;}
+.bar-fill{height:6px;border-radius:3px;}
+.mono{font-family:"SF Mono","Fira Code",monospace;font-size:12px;font-variant-numeric:tabular-nums;}
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+@media(max-width:720px){.charts-grid{grid-template-columns:1fr;}}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;}
+.chart-card.wide{grid-column:1/-1;}
+.chart-title{font-size:13px;font-weight:700;margin-bottom:3px;}
+.chart-sub{font-size:11px;color:var(--muted);margin-bottom:16px;}
+.obs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;}
+.obs-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;}
+.obs-card h4{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;}
+.obs-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.obs-row:last-child{border-bottom:none;}
+.pos{color:#00ff9f;} .neg{color:#ff2d78;} .neu{color:#ffe93e;}
+footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-align:center;font-size:12px;color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <h1>PPG Delay Chain — Simulation Results</h1>
+  <p id="header-subtitle"></p>
+  <div style="display:flex;align-items:center;gap:14px;margin-top:12px;flex-wrap:wrap;">
+    <div class="badges" id="header-badges"></div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+      <label style="font-size:12px;color:var(--muted);white-space:nowrap;">Dataset:</label>
+      <select id="dataset-select" onchange="switchDataset(this.value)"
+        style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;">
+        <option value="single">Single Stage — VDD Sweep</option>
+        <option value="chain_raw">101-Stage Chain — Full Ring Results</option>
+        <option value="chain">101-Stage Chain — Per Stage (÷101, single-invertor equivalent)</option>
+        <option value="corr">Comparison — Single Stage vs Chain Per Stage</option>
+      </select>
+    </div>
+  </div>
+</header>
+
+<!-- ═══ SINGLE INV VIEW ═══ -->
+<div id="view-single">
+<div class="kpis" id="kpis"></div>
+
+<!-- SECTION 1 -->
+<section>
+  <div class="section-title"><span class="bar"></span><span id="sweep-title">Stage Delay vs VDD — All Cells</span></div>
+  <div class="controls">
+    <label>Metric:</label>
+    <button class="btn active" data-sm="stage_delay" onclick="setSweepMetric(this)">Stage Delay</button>
+    <button class="btn"        data-sm="iddq"        onclick="setSweepMetric(this)">IDDQ</button>
+    <button class="btn"        data-sm="iddarail"    onclick="setSweepMetric(this)">IDDArail</button>
+    <button class="btn"        data-sm="acceff"      onclick="setSweepMetric(this)">ACCeff</button>
+    <button class="btn"        data-sm="acreff"      onclick="setSweepMetric(this)">ACReff</button>
+    <div class="sep"></div>
+    <label>TSL:</label>
+    <button class="btn active"   id="f6" onclick="toggleTsl(6)">6TSL</button>
+    <button class="btn active p" id="f7" onclick="toggleTsl(7)">7TSL</button>
+    <button class="btn active o" id="f8" onclick="toggleTsl(8)">8TSL</button>
+    <div class="sep"></div>
+    <label>Cell:</label>
+    <button class="btn active" id="fcINV"    onclick="toggleCell('INV')">INV</button>
+    <button class="btn active" id="fcNAND2B" onclick="toggleCell('NAND2B')">NAND2B</button>
+    <button class="btn active" id="fcNOR2B"  onclick="toggleCell('NOR2B')">NOR2B</button>
+    <button class="btn active" id="fcNAND3B" onclick="toggleCell('NAND3B')">NAND3B</button>
+    <button class="btn active" id="fcAOI21"  onclick="toggleCell('AOI21')">AOI21</button>
+    <button class="btn active" id="fcAOI22"  onclick="toggleCell('AOI22')">AOI22</button>
+    <button class="btn active" id="fcOAI21"  onclick="toggleCell('OAI21')">OAI21</button>
+    <button class="btn active" id="fcOAI22"  onclick="toggleCell('OAI22')">OAI22</button>
+    <div class="sep"></div>
+    <button class="btn" onclick="resetFilters()">Reset</button>
+  </div>
+  <div class="chart-card wide"><canvas id="sweepChart" height="80"></canvas></div>
+</section>
+
+<!-- SECTION 2 -->
+<section>
+  <div class="section-title"><span class="bar"></span>Data Table — Multi-VDD &amp; Multi-Metric</div>
+
+  <!-- Mode toggle -->
+  <div class="controls" style="margin-bottom:10px">
+    <label>View mode:</label>
+    <button class="btn active" id="mode-mv" onclick="setMode('multi_vdd')">Multiple VDDs, one metric</button>
+    <button class="btn"        id="mode-mm" onclick="setMode('multi_met')">All metrics, one VDD</button>
+    <button class="btn"        id="mode-full" onclick="setMode('full')">All metrics × all selected VDDs</button>
+  </div>
+
+  <!-- VDD selector row (multi-select) -->
+  <div style="margin-bottom:8px;font-size:12px;color:var(--muted)">
+    <span id="vdd-hint">Click to toggle VDD columns (multiple allowed):</span>
+  </div>
+  <div class="vdd-row" id="vdd-row"></div>
+
+  <!-- Metric selector row (multi-select) -->
+  <div style="margin-bottom:8px;font-size:12px;color:var(--muted)" id="met-hint-wrap">
+    <span>Click to toggle metric columns (multiple allowed):</span>
+  </div>
+  <div class="controls" id="metric-row">
+    <button class="btn active" data-m="stage_delay" onclick="toggleMetric(this)">Stage Delay (ps)</button>
+    <button class="btn"        data-m="iddq"        onclick="toggleMetric(this)">IDDQ (A)</button>
+    <button class="btn"        data-m="iddarail"    onclick="toggleMetric(this)">IDDArail (A)</button>
+    <button class="btn"        data-m="acceff"      onclick="toggleMetric(this)">ACCeff (F)</button>
+    <button class="btn"        data-m="acreff"      onclick="toggleMetric(this)">ACReff (Ω)</button>
+  </div>
+
+  <div class="table-wrap" style="margin-top:14px">
+    <table id="main-table">
+      <thead id="main-thead"></thead>
+      <tbody id="metric-tbody"></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- SECTION 3: Correlation charts -->
+<section>
+  <div class="section-title"><span class="bar"></span>Correlation &amp; Analysis Charts</div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title" id="barChart-title"></div>
+      <div class="chart-sub"   id="barChart-sub"></div>
+      <canvas id="barChart" height="220"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title" id="scatterChart-title"></div>
+      <div class="chart-sub"   id="scatterChart-sub"></div>
+      <canvas id="scatterChart" height="220"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title" id="gainChart-title"></div>
+      <div class="chart-sub"   id="gainChart-sub"></div>
+      <canvas id="gainChart" height="220"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title" id="scatter2Chart-title"></div>
+      <div class="chart-sub"   id="scatter2Chart-sub"></div>
+      <canvas id="scatter2Chart" height="220"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title" id="scatter3Chart-title"></div>
+      <div class="chart-sub"   id="scatter3Chart-sub"></div>
+      <canvas id="scatter3Chart" height="220"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title" id="accChart-title"></div>
+      <div class="chart-sub"   id="accChart-sub"></div>
+      <canvas id="accChart" height="220"></canvas>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 4 -->
+<section>
+  <div class="section-title"><span class="bar"></span>Key Observations</div>
+  <div class="obs-grid" id="obs-grid"></div>
+</section>
+
+</div><!-- end #view-single -->
+
+<!-- ═══ 101-STAGE CHAIN RAW VIEW ═══ -->
+<div id="view-chain-raw" style="display:none">
+<section>
+  <div class="section-title"><span class="bar"></span>② 101-Stage Chain — Raw Ring Oscillator Totals (×STAGES)</div>
+  <p style="font-size:12px;color:var(--muted);margin-bottom:10px;" id="chain-raw-conditions"></p>
+  <div style="background:var(--surface2);border:1px solid #ffe93e55;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.7">
+    <span style="color:#ffe93e">⚠ Raw ring oscillator totals — not per-stage.</span>
+    Scalable metrics (stage delay, Ceff, IDDQ) are multiplied by <code id="chain-raw-stages-note"></code> to recover the full-chain quantities before HSPICE internal division.
+    ACReff is an intrinsic ratio (V/I) and is <strong>not scaled</strong> — it is identical in raw and per-stage views.
+    <br>Formula: <code>raw_stage_delay = stage_delay × STAGES</code> &nbsp;|&nbsp; <code>raw_ceff = ceff × STAGES</code> &nbsp;|&nbsp; <code>raw_iddq = iddq × STAGES</code>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Cell</th>
+          <th>Total Ring Delay (ps) [stage_delay × STAGES]</th>
+          <th>Total Ceff (fF) [ceff × STAGES]</th>
+          <th>ACReff (KΩ) [intrinsic — unchanged]</th>
+          <th>Total IDDQ (nA) [iddq × STAGES]</th>
+        </tr>
+      </thead>
+      <tbody id="chain-raw-tbody"></tbody>
+    </table>
+  </div>
+</section>
+<section>
+  <div class="section-title"><span class="bar"></span>Raw 101-Stage Ring Totals — Bar Charts</div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">Total Ring Oscillator Delay (ps) — ×STAGES</div>
+      <div class="chart-sub" id="chain-raw-sub-delay"></div>
+      <canvas id="chain-raw-delay" height="220"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Total Ceff (fF) — ×STAGES</div>
+      <div class="chart-sub" id="chain-raw-sub-ceff"></div>
+      <canvas id="chain-raw-ceff" height="220"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">ACReff (KΩ) — intrinsic ratio, not scaled</div>
+      <div class="chart-sub" id="chain-raw-sub-acreff"></div>
+      <canvas id="chain-raw-acreff" height="220"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Total IDDQ (nA) — ×STAGES</div>
+      <div class="chart-sub" id="chain-raw-sub-iddq"></div>
+      <canvas id="chain-raw-iddq" height="220"></canvas>
+    </div>
+  </div>
+</section>
+</div><!-- end #view-chain-raw -->
+
+<!-- ═══ 101-STAGE CHAIN PER-STAGE VIEW ═══ -->
+<div id="view-chain" style="display:none">
+<section>
+  <div class="section-title"><span class="bar"></span>③ 101-Stage Chain — Per-Stage Values (as reported by HSPICE .measure)</div>
+  <p style="font-size:12px;color:var(--muted);margin-bottom:10px;" id="chain-conditions"></p>
+  <div style="background:var(--surface2);border:1px solid var(--accent2)55;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.7">
+    <span style="color:var(--accent2)">ℹ HSPICE .measure internally divides by STAGES=101.</span>
+    <code>stage_delay = delay2 / (2×STAGES)</code> &nbsp;|&nbsp; <code>iddq_stage = iddq_avg / STAGES</code> &nbsp;|&nbsp; <code>ceff</code> and <code>acreff</code> are intrinsic per-stage quantities.
+    These values are directly comparable to single-invertor simulation results.
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Cell</th>
+          <th>Stage Delay (ps) [÷(2×STAGES)]</th>
+          <th>Ceff (fF) [per stage]</th>
+          <th>ACReff (KΩ) [intrinsic ratio]</th>
+          <th>IDDQ/stage (nA) [÷STAGES]</th>
+        </tr>
+      </thead>
+      <tbody id="chain-tbody"></tbody>
+    </table>
+  </div>
+</section>
+<section>
+  <div class="section-title"><span class="bar"></span>Per-Stage Metrics — 7TSL SLVT Cells</div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">Stage Delay (ps) — per stage [÷(2×STAGES)]</div>
+      <div class="chart-sub" id="chain-sub-delay"></div>
+      <canvas id="chain-delay" height="220"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Ceff (fF) — per stage</div>
+      <div class="chart-sub" id="chain-sub-ceff"></div>
+      <canvas id="chain-ceff" height="220"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">ACReff (KΩ) — intrinsic ratio, not scaled</div>
+      <div class="chart-sub" id="chain-sub-acreff"></div>
+      <canvas id="chain-acreff" height="220"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">IDDQ/stage (nA) — per stage [÷STAGES]</div>
+      <div class="chart-sub" id="chain-sub-iddq"></div>
+      <canvas id="chain-iddq" height="220"></canvas>
+    </div>
+  </div>
+</section>
+</div><!-- end #view-chain -->
+
+<!-- ═══ COMPARISON VIEW ═══ -->
+<div id="view-corr" style="display:none">
+<section>
+  <div class="section-title"><span class="bar"></span>Comparison — Single Stage vs Chain Per-Stage @ 0.70V</div>
+  <p style="font-size:12px;color:var(--muted);margin-bottom:10px;" id="corr-subtitle"></p>
+
+  <!-- Legend + context notes -->
+  <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:20px;font-size:12px;line-height:1.8">
+    <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:10px;">
+      <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#00d4ff;margin-right:6px;vertical-align:middle"></span><strong style="color:#00d4ff">Single Stage</strong> — v0.6SB2 (Spice-260604-sandbox) · ULVT · single-cell SPICE · VDD sweep</span>
+      <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#ff6b35;margin-right:6px;vertical-align:middle"></span><strong style="color:#ff6b35">Chain Per-Stage</strong> — v0.6SB2 (Spice-260604-sandbox) · ULVT · 101-stage chain · per-stage values as reported by HSPICE</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:8px;color:var(--muted)">
+      <div><span style="color:#ffe93e">⚠ Stage Delay:</span> Both datasets use the same model (v0.6SB2 · Spice-260604-sandbox). Any delta is due to circuit topology: isolated single cell vs. embedded stage in a 101-stage oscillating ring with real fanout loading.</div>
+      <div><span style="color:#ff2d78">⚠ IDDQ — NOT directly comparable:</span> Single-INV IDDQ = DC leakage of 1 cell (FIND I AT=0 ps). Chain per-stage IDDQ = dynamic current per stage in an oscillating ring — fundamentally different quantities.</div>
+      <div><span style="color:#00ff9f">✓ Ceff / ACCeff:</span> Comparable — both derived from charge-based extraction. Small delta reflects circuit topology (ring vs. isolated cell), not a model difference.</div>
+      <div><span style="color:#00ff9f">✓ ACReff:</span> Units differ (single=Ω, chain=KΩ) — shown on separate axes. Ratio reflects circuit topology difference.</div>
+    </div>
+  </div>
+
+  <!-- Delta summary table -->
+  <div class="table-wrap" style="margin-bottom:32px">
+    <table>
+      <thead>
+        <tr>
+          <th rowspan="2">Chain Cell</th>
+          <th rowspan="2">→ Single-INV Match</th>
+          <th colspan="3" style="text-align:center;border-left:2px solid var(--border)">Stage Delay (ps)</th>
+          <th colspan="2" style="text-align:center;border-left:2px solid var(--border);color:#ff2d78">IDDQ ⚠ not comparable</th>
+          <th colspan="3" style="text-align:center;border-left:2px solid var(--border)">Ceff / ACCeff (fF)</th>
+          <th colspan="2" style="text-align:center;border-left:2px solid var(--border)">ACReff</th>
+        </tr>
+        <tr>
+          <th style="text-align:right;border-left:2px solid var(--border)">Single Stage (v0.6SB2)</th>
+          <th style="text-align:right">Chain Per-Stage (v0.6SB2)</th>
+          <th style="text-align:right">Δ%</th>
+          <th style="text-align:right;border-left:2px solid var(--border);color:#ff2d78">Single DC leakage (nA)</th>
+          <th style="text-align:right;color:#ff2d78">Chain dynamic/stage (nA)</th>
+          <th style="text-align:right;border-left:2px solid var(--border)">Single ACCeff (fF)</th>
+          <th style="text-align:right">Chain Ceff (fF)</th>
+          <th style="text-align:right">Δ%</th>
+          <th style="text-align:right;border-left:2px solid var(--border)">Single ACReff (Ω)</th>
+          <th style="text-align:right">Chain ACReff (KΩ)</th>
+        </tr>
+      </thead>
+      <tbody id="corr-tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- Grouped bar charts -->
+  <div class="section-title" style="margin-bottom:4px"><span class="bar"></span>Grouped Bar Charts — Single Stage vs Chain Per-Stage @ 0.70V</div>
+  <p style="font-size:11px;color:var(--muted);margin-bottom:14px;">Cyan = Single Stage · Orange = Chain Per-Stage · Both use v0.6SB2 (Spice-260604-sandbox) · Any delta is due to circuit topology, not model version</p>
+  <div class="charts-grid" style="margin-bottom:32px">
+    <div class="chart-card">
+      <div class="chart-title">Stage Delay (ps)</div>
+      <div class="chart-sub" id="corr-bar-delay-sub"></div>
+      <canvas id="corr-bar-delay" height="240"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">IDDQ (nA) — ⚠ Not directly comparable</div>
+      <div class="chart-sub" id="corr-bar-iddq-sub"></div>
+      <canvas id="corr-bar-iddq" height="240"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Ceff / ACCeff (fF)</div>
+      <div class="chart-sub" id="corr-bar-ceff-sub"></div>
+      <canvas id="corr-bar-ceff" height="240"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">ACReff — Single Stage (Ω) · Chain Per-Stage (KΩ)</div>
+      <div class="chart-sub" id="corr-bar-acreff-sub"></div>
+      <canvas id="corr-bar-acreff" height="240"></canvas>
+    </div>
+  </div>
+
+  <!-- Scatter plots -->
+  <div class="section-title" style="margin-bottom:4px"><span class="bar"></span>Scatter Plots — Single Stage (X) vs Chain Per-Stage (Y) @ 0.70V</div>
+  <p style="font-size:11px;color:var(--muted);margin-bottom:16px;">Each point = one cell · Dashed line = 1:1 · Points above = chain larger · Deviation from diagonal = circuit topology difference (ring oscillator vs. isolated cell) · Both use v0.6SB2 (Spice-260604-sandbox)</p>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">Stage Delay (ps)</div>
+      <div class="chart-sub" id="corr-sc-delay-sub"></div>
+      <canvas id="corr-sc-delay" height="260"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">IDDQ — ⚠ Not directly comparable</div>
+      <div class="chart-sub" id="corr-sc-iddq-sub"></div>
+      <canvas id="corr-sc-iddq" height="260"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Ceff / ACCeff (fF)</div>
+      <div class="chart-sub" id="corr-sc-ceff-sub"></div>
+      <canvas id="corr-sc-ceff" height="260"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">% Difference — Stage Delay &amp; Ceff (IDDQ excluded)</div>
+      <div class="chart-sub" id="corr-sc-pct-sub"></div>
+      <canvas id="corr-sc-pct" height="260"></canvas>
+    </div>
+  </div>
+</section>
+</div><!-- end #view-corr -->
+
+<footer id="page-footer">PPG Delay Chain Simulation Results &nbsp;·&nbsp; Made with IBM Bob</footer>
+</div>
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════════════════════
+const VDD=[0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,1.0,1.05,1.1,1.15];
+const CELLS=['6TSL_INV','6TSL_NAND2B','6TSL_NOR2B','6TSL_NAND3B','6TSL_AOI21','6TSL_AOI22','6TSL_OAI21','6TSL_OAI22',
+             '7TSL_INV','7TSL_NAND2B','7TSL_NOR2B','7TSL_NAND3B','7TSL_AOI21','7TSL_AOI22','7TSL_OAI21','7TSL_OAI22',
+             '8TSL_INV','8TSL_NAND2B','8TSL_NOR2B','8TSL_NAND3B','8TSL_AOI21','8TSL_AOI22','8TSL_OAI21','8TSL_OAI22'];
+const CELL_TYPES=['INV','NAND2B','NOR2B','NAND3B','AOI21','AOI22','OAI21','OAI22'];
+const D={};
+function r(c,m,v){if(!D[c])D[c]={};D[c][m]=v;}
+
+// stage_delay (ps)
+r('6TSL_INV','stage_delay',[8.81971,7.86586,7.17854,6.6657,6.27212,5.96448,5.71996,5.52207,5.35697,5.22498,5.11031,5.01918,4.94228,4.87627]);
+r('6TSL_NAND2B','stage_delay',[15.0613,13.2182,11.8966,10.911,10.1496,9.55996,9.08571,8.6989,8.38478,8.11283,7.89928,7.72038,7.54919,7.42024]);
+r('6TSL_NOR2B','stage_delay',[16.7009,14.6036,13.0898,11.9683,11.1193,10.454,9.91338,9.47984,9.12542,8.82638,8.57832,8.36566,8.18874,8.04023]);
+r('6TSL_NAND3B','stage_delay',[19.387,16.8596,15.0487,13.6994,12.6763,11.8754,11.232,10.7121,10.2879,9.934,9.63416,9.38062,9.1686,8.98614]);
+r('6TSL_AOI21','stage_delay',[21.0404,18.3536,16.4216,14.9768,13.8867,13.0082,12.3148,11.7594,11.2942,10.9126,10.5859,10.3121,10.0762,9.87947]);
+r('6TSL_AOI22','stage_delay',[23.7721,20.6714,18.4592,16.7992,15.535,14.5421,13.7479,13.0963,12.5675,12.1141,11.7403,11.421,11.1358,10.9063]);
+r('6TSL_OAI21','stage_delay',[21.2363,18.5018,16.5364,15.0821,13.9654,13.0917,12.3942,11.8319,11.3635,10.9744,10.6438,10.3665,10.127,9.92294]);
+r('6TSL_OAI22','stage_delay',[22.2166,19.3565,17.3113,15.7891,14.618,13.6979,12.9684,12.3723,11.8891,11.4759,11.1334,10.8404,10.5889,10.3777]);
+r('7TSL_INV','stage_delay',[7.53179,6.78377,6.23923,5.83587,5.52919,5.285,5.09456,4.93859,4.81399,4.71041,4.62193,4.55624,4.4958,4.4464]);
+r('7TSL_NAND2B','stage_delay',[11.8708,10.5047,9.52258,8.78781,8.22247,7.77774,7.42449,7.13676,6.89493,6.69776,6.53889,6.40064,6.28332,6.18302]);
+r('7TSL_NOR2B','stage_delay',[13.1721,11.6132,10.493,9.65575,9.01607,8.51407,8.10998,7.78829,7.51874,7.29739,7.11245,6.95614,6.82249,6.70502]);
+r('7TSL_NAND3B','stage_delay',[15.2798,13.403,12.0505,11.0434,10.2699,9.65884,9.17735,8.78157,8.46359,8.19517,7.96648,7.77829,7.61204,7.46956]);
+r('7TSL_AOI21','stage_delay',[16.6917,14.6701,13.2145,12.1269,11.2832,10.6246,10.1045,9.67508,9.32367,9.02649,8.78534,8.57285,8.39336,8.24346]);
+r('7TSL_AOI22','stage_delay',[18.7145,16.4217,14.7658,13.5278,12.5709,11.8161,11.2281,10.7314,10.3318,9.99375,9.71211,9.47199,9.25221,9.08265]);
+r('7TSL_OAI21','stage_delay',[16.8572,14.809,13.3362,12.2381,11.397,10.7394,10.2052,9.78121,9.42215,9.13636,8.88829,8.67824,8.49817,8.34655]);
+r('7TSL_OAI22','stage_delay',[17.6705,15.5327,13.9836,12.8332,11.9497,11.2558,10.6988,10.2493,9.87779,9.56768,9.30954,9.08878,8.90148,8.74195]);
+r('8TSL_INV','stage_delay',[7.06873,6.4094,5.93001,5.57072,5.29929,5.08742,4.92032,4.78712,4.67869,4.59216,4.51814,4.4539,4.40422,4.36244]);
+r('8TSL_NAND2B','stage_delay',[10.569,9.40234,8.57097,7.94292,7.45896,7.082,6.7756,6.53011,6.32373,6.16483,6.02901,5.91399,5.80535,5.7261]);
+r('8TSL_NOR2B','stage_delay',[11.6697,10.3428,9.39384,8.67993,8.13777,7.70634,7.36657,7.09098,6.86687,6.67902,6.52052,6.39196,6.27309,6.1798]);
+r('8TSL_NAND3B','stage_delay',[13.4963,11.8997,10.7522,9.89469,9.23626,8.71809,8.30467,7.97023,7.69394,7.46215,7.27444,7.1142,6.96906,6.86165]);
+r('8TSL_AOI21','stage_delay',[14.8011,13.0836,11.8311,10.899,10.1834,9.61544,9.16926,8.79691,8.49313,8.24294,8.03249,7.86847,7.7072,7.5747]);
+r('8TSL_AOI22','stage_delay',[16.5108,14.5768,13.1697,12.1152,11.2992,10.6574,10.15,9.73111,9.3877,9.10209,8.8676,8.6544,8.48719,8.3365]);
+r('8TSL_OAI21','stage_delay',[14.9934,13.2613,11.9973,11.0575,10.333,9.76889,9.31346,8.94652,8.64585,8.39869,8.19264,8.01268,7.86154,7.73326]);
+r('8TSL_OAI22','stage_delay',[15.7139,13.8874,12.5663,11.5819,10.8211,10.2265,9.75247,9.36672,9.04952,8.78693,8.56795,8.37758,8.21884,8.0819]);
+
+// iddq (A)
+r('6TSL_INV','iddq',[5.55195e-08,5.87252e-08,6.20781e-08,6.55809e-08,6.92613e-08,7.31193e-08,7.71772e-08,8.14626e-08,8.59979e-08,9.08107e-08,9.59621e-08,1.01508e-07,1.07581e-07,1.14309e-07]);
+r('6TSL_NAND2B','iddq',[3.19522e-08,3.38785e-08,3.58991e-08,3.80196e-08,4.02456e-08,4.25993e-08,4.50917e-08,4.77285e-08,5.05429e-08,5.35738e-08,5.6849e-08,6.04516e-08,6.44818e-08,6.9067e-08]);
+r('6TSL_NOR2B','iddq',[5.05485e-08,5.33795e-08,5.63383e-08,5.94191e-08,6.26554e-08,6.60472e-08,6.9611e-08,7.33802e-08,7.73714e-08,8.16236e-08,8.61977e-08,9.11715e-08,9.6656e-08,1.0284e-07]);
+r('6TSL_NAND3B','iddq',[3.54106e-08,3.76033e-08,3.99125e-08,4.23273e-08,4.48863e-08,4.75842e-08,5.04374e-08,5.3485e-08,5.67324e-08,6.02352e-08,6.40377e-08,6.82343e-08,7.29306e-08,7.83262e-08]);
+r('6TSL_AOI21','iddq',[5.38153e-08,5.68878e-08,6.00908e-08,6.34437e-08,6.69631e-08,7.06546e-08,7.45404e-08,7.86538e-08,8.30225e-08,8.76854e-08,9.27203e-08,9.82103e-08,1.04305e-07,1.112e-07]);
+r('6TSL_AOI22','iddq',[5.44842e-08,5.75984e-08,6.08458e-08,6.42431e-08,6.7818e-08,7.15705e-08,7.55285e-08,7.97251e-08,8.42049e-08,8.90066e-08,9.42302e-08,9.99867e-08,1.06448e-07,1.13887e-07]);
+r('6TSL_OAI21','iddq',[5.39763e-08,5.70655e-08,6.02907e-08,6.36602e-08,6.71851e-08,7.08988e-08,7.48068e-08,7.89369e-08,8.33222e-08,8.80074e-08,9.30644e-08,9.85767e-08,1.04694e-07,1.11611e-07]);
+r('6TSL_OAI22','iddq',[5.17447e-08,5.45786e-08,5.75318e-08,6.06071e-08,6.38323e-08,6.72185e-08,7.07767e-08,7.45459e-08,7.85538e-08,8.28559e-08,8.75189e-08,9.26481e-08,9.84102e-08,1.05038e-07]);
+r('7TSL_INV','iddq',[1.08982e-07,1.16063e-07,1.23518e-07,1.31367e-07,1.39655e-07,1.48409e-07,1.57674e-07,1.67483e-07,1.77897e-07,1.88982e-07,2.00839e-07,2.13585e-07,2.27385e-07,2.42539e-07]);
+r('7TSL_NAND2B','iddq',[6.28886e-08,6.70797e-08,7.14928e-08,7.61557e-08,8.10851e-08,8.63032e-08,9.18376e-08,9.77218e-08,1.04e-07,1.10728e-07,1.17983e-07,1.25877e-07,1.34581e-07,1.4434e-07]);
+r('7TSL_NOR2B','iddq',[9.87571e-08,1.05033e-07,1.11627e-07,1.18577e-07,1.25899e-07,1.33632e-07,1.41809e-07,1.5048e-07,1.59694e-07,1.69531e-07,1.80084e-07,1.91491e-07,2.03948e-07,2.17748e-07]);
+r('7TSL_NAND3B','iddq',[6.99135e-08,7.46625e-08,7.96807e-08,8.49765e-08,9.05831e-08,9.65283e-08,1.0284e-07,1.09562e-07,1.16746e-07,1.24456e-07,1.32788e-07,1.41887e-07,1.51945e-07,1.63258e-07]);
+r('7TSL_AOI21','iddq',[1.05227e-07,1.11977e-07,1.19066e-07,1.26549e-07,1.34431e-07,1.42758e-07,1.51568e-07,1.60921e-07,1.70863e-07,1.81499e-07,1.92923e-07,2.05291e-07,2.18858e-07,2.33946e-07]);
+r('7TSL_AOI22','iddq',[1.06484e-07,1.1332e-07,1.20509e-07,1.28081e-07,1.36074e-07,1.44523e-07,1.53477e-07,1.62992e-07,1.73139e-07,1.84019e-07,1.95777e-07,2.08611e-07,2.228e-07,2.38787e-07]);
+r('7TSL_OAI21','iddq',[1.05213e-07,1.11949e-07,1.19033e-07,1.26488e-07,1.34343e-07,1.42636e-07,1.51418e-07,1.60721e-07,1.70619e-07,1.81194e-07,1.92557e-07,2.04858e-07,2.18359e-07,2.33369e-07]);
+r('7TSL_OAI22','iddq',[1.00694e-07,1.06909e-07,1.13426e-07,1.20282e-07,1.27492e-07,1.35103e-07,1.43158e-07,1.51695e-07,1.60782e-07,1.70519e-07,1.81022e-07,1.92468e-07,2.05125e-07,2.19369e-07]);
+r('8TSL_INV','iddq',[1.58862e-07,1.69426e-07,1.80556e-07,1.92302e-07,2.0472e-07,2.17848e-07,2.31748e-07,2.46486e-07,2.6214e-07,2.7881e-07,2.96635e-07,3.15781e-07,3.36509e-07,3.59168e-07]);
+r('8TSL_NAND2B','iddq',[9.23317e-08,9.861e-08,1.05232e-07,1.12232e-07,1.19643e-07,1.27492e-07,1.35814e-07,1.44673e-07,1.54121e-07,1.64235e-07,1.75138e-07,1.86973e-07,1.99973e-07,2.14473e-07]);
+r('8TSL_NOR2B','iddq',[1.4321e-07,1.52522e-07,1.62331e-07,1.72673e-07,1.83592e-07,1.95144e-07,2.07373e-07,2.2034e-07,2.3414e-07,2.48868e-07,2.64661e-07,2.81719e-07,3.00304e-07,3.20832e-07]);
+r('8TSL_NAND3B','iddq',[1.03101e-07,1.1024e-07,1.17784e-07,1.25766e-07,1.3422e-07,1.43185e-07,1.52706e-07,1.62842e-07,1.73678e-07,1.85296e-07,1.97842e-07,2.11497e-07,2.2653e-07,2.43361e-07]);
+r('8TSL_AOI21','iddq',[1.53097e-07,1.63142e-07,1.73717e-07,1.84869e-07,1.96648e-07,2.09105e-07,2.223e-07,2.36305e-07,2.5121e-07,2.67136e-07,2.84239e-07,3.02747e-07,3.22975e-07,3.45401e-07]);
+r('8TSL_AOI22','iddq',[1.54862e-07,1.65024e-07,1.75732e-07,1.87028e-07,1.98963e-07,2.11592e-07,2.24987e-07,2.39225e-07,2.54413e-07,2.70695e-07,2.88258e-07,3.07387e-07,3.28482e-07,3.52141e-07]);
+r('8TSL_OAI21','iddq',[1.5313e-07,1.63158e-07,1.73705e-07,1.84819e-07,1.96554e-07,2.08955e-07,2.22089e-07,2.36022e-07,2.50849e-07,2.66676e-07,2.83673e-07,3.02058e-07,3.22165e-07,3.44447e-07]);
+r('8TSL_OAI22','iddq',[1.46078e-07,1.55287e-07,1.64962e-07,1.75149e-07,1.85879e-07,1.97226e-07,2.09222e-07,2.21956e-07,2.35523e-07,2.50039e-07,2.65687e-07,2.82707e-07,3.01459e-07,3.22475e-07]);
+
+// iddarail (A)
+r('6TSL_INV','iddarail',[0.000232157,0.000294462,0.000362398,0.000435194,0.000513075,0.000595071,0.000681124,0.000770595,0.000864177,0.000960135,0.00105987,0.00116103,0.00126467,0.00137098]);
+r('6TSL_NAND2B','iddarail',[0.000122165,0.000156603,0.000194102,0.000234523,0.000277491,0.000322736,0.00036997,0.000419069,0.000469857,0.000522162,0.000575735,0.0006297,0.000686158,0.000742593]);
+r('6TSL_NOR2B','iddarail',[0.000110904,0.000142917,0.000178087,0.000216061,0.00025658,0.000299407,0.000344787,0.000391804,0.000440803,0.0004915,0.0005434,0.000597046,0.000651568,0.00070693]);
+r('6TSL_NAND3B','iddarail',[0.000108335,0.000140219,0.000175318,0.000213421,0.000254168,0.000297175,0.000342299,0.000389588,0.000438382,0.000488692,0.000540788,0.000593794,0.000647716,0.000703111]);
+r('6TSL_AOI21','iddarail',[9.42746e-05,0.000121725,0.000151908,0.000184735,0.000219786,0.000257281,0.000296652,0.000337579,0.000380672,0.00042522,0.000471036,0.000518293,0.0005668,0.000616821]);
+r('6TSL_AOI22','iddarail',[8.90772e-05,0.000115256,0.000144051,0.000175515,0.000209237,0.000244974,0.000282854,0.000322489,0.000363961,0.000406917,0.000451504,0.000497106,0.000544687,0.00059293]);
+r('6TSL_OAI21','iddarail',[9.25911e-05,0.000119767,0.000149786,0.000182337,0.000217343,0.000254557,0.000293739,0.000334596,0.00037744,0.000421668,0.000467457,0.000514591,0.000562956,0.000612638]);
+r('6TSL_OAI22','iddarail',[9.6733e-05,0.000125005,0.000156207,0.000190061,0.000226569,0.00026528,0.000305953,0.00034884,0.000392939,0.000439374,0.00048698,0.000536082,0.000586499,0.000637985]);
+r('7TSL_INV','iddarail',[0.000348688,0.000440387,0.000539885,0.000646669,0.000760197,0.000880197,0.00100625,0.00113784,0.00127479,0.00141628,0.0015624,0.00171079,0.00186367,0.00202153]);
+r('7TSL_NAND2B','iddarail',[0.000193786,0.000246887,0.000304441,0.000366378,0.000431698,0.000500381,0.000571898,0.000646152,0.000723057,0.000801646,0.000882414,0.000964971,0.00104936,0.00113508]);
+r('7TSL_NOR2B','iddarail',[0.000175822,0.000225166,0.000279042,0.000337148,0.000399132,0.000464664,0.000533331,0.00060457,0.00067865,0.000754792,0.000833457,0.000913718,0.000996105,0.00108097]);
+r('7TSL_NAND3B','iddarail',[0.000172044,0.000221165,0.000275104,0.000333222,0.000395234,0.000460572,0.000529306,0.000600852,0.00067429,0.000750368,0.000828567,0.000908342,0.000990595,0.00107393]);
+r('7TSL_AOI21','iddarail',[0.000149515,0.000191912,0.000238459,0.00028882,0.000342754,0.000399808,0.000459871,0.0005223,0.000587645,0.000655356,0.000724906,0.00079716,0.000871246,0.000947017]);
+r('7TSL_AOI22','iddarail',[0.000141798,0.000182208,0.000226711,0.000274869,0.000326398,0.000381248,0.000438527,0.000499003,0.000561779,0.000627071,0.000694083,0.000763408,0.000836032,0.000908881]);
+r('7TSL_OAI21','iddarail',[0.000146925,0.000188914,0.000235007,0.000284927,0.000338295,0.000394797,0.000454142,0.000516287,0.00058102,0.000647331,0.000716883,0.000788106,0.00086122,0.000936419]);
+r('7TSL_OAI22','iddarail',[0.000153523,0.00019712,0.000245217,0.000297037,0.000352499,0.000411349,0.000473363,0.00053786,0.000605291,0.000675172,0.000746887,0.000820823,0.000896981,0.000974705]);
+r('8TSL_INV','iddarail',[0.000456059,0.000573849,0.00070186,0.000839894,0.000986072,0.00114104,0.00130298,0.00147309,0.00164834,0.00182956,0.00201832,0.00221462,0.00241349,0.00261776]);
+r('8TSL_NAND2B','iddarail',[0.000262713,0.000333419,0.000409711,0.000491448,0.000577688,0.000668199,0.000762618,0.000860492,0.000961467,0.00106484,0.00117067,0.00127915,0.0013915,0.00150305]);
+r('8TSL_NOR2B','iddarail',[0.000239152,0.000305116,0.000376749,0.000454138,0.000535961,0.000622796,0.000713081,0.00080769,0.00090484,0.0010056,0.00110958,0.00121483,0.00132403,0.00143411]);
+r('8TSL_NAND3B','iddarail',[0.000233799,0.000299256,0.000370852,0.000447996,0.000530065,0.000616515,0.000706808,0.000800777,0.000898036,0.000998713,0.00110119,0.00120642,0.00131477,0.00142364]);
+r('8TSL_AOI21','iddarail',[0.000203835,0.000260525,0.000322825,0.000389946,0.000461434,0.000537252,0.000616492,0.000700361,0.000786745,0.000876211,0.000969019,0.00106206,0.00116126,0.0012618]);
+r('8TSL_AOI22','iddarail',[0.000193866,0.000247987,0.000307433,0.000371643,0.000440043,0.000512708,0.00058926,0.000669271,0.000752383,0.000838894,0.000927447,0.00101994,0.00111399,0.00121031]);
+r('8TSL_OAI21','iddarail',[0.000200238,0.000256093,0.000317569,0.000383801,0.000454533,0.000529118,0.00060768,0.000689783,0.000775021,0.000862815,0.000953657,0.00104767,0.00114416,0.0012431]);
+r('8TSL_OAI22','iddarail',[0.000208884,0.00026712,0.000331017,0.000399955,0.00047353,0.000551499,0.000632926,0.000718014,0.000807016,0.000898459,0.000992698,0.0010906,0.00119096,0.00129359]);
+
+// acceff (F)
+r('6TSL_INV','acceff',[4.09727e-15,4.21311e-15,4.33745e-15,4.46437e-15,4.59861e-15,4.73367e-15,4.87122e-15,5.00738e-15,5.14487e-15,5.28182e-15,5.41734e-15,5.551e-15,5.6832e-15,5.81436e-15]);
+r('6TSL_NAND2B','acceff',[3.68204e-15,3.76542e-15,3.85015e-15,3.93813e-15,4.02472e-15,4.11498e-15,4.20292e-15,4.28981e-15,4.37841e-15,4.46016e-15,4.54887e-15,4.631e-15,4.71e-15,4.79247e-15]);
+r('6TSL_NOR2B','acceff',[3.70813e-15,3.79788e-15,3.88793e-15,3.9807e-15,4.07789e-15,4.17535e-15,4.27441e-15,4.3715e-15,4.47119e-15,4.56816e-15,4.6631e-15,4.75844e-15,4.85206e-15,4.94409e-15]);
+r('6TSL_NAND3B','acceff',[4.20357e-15,4.30076e-15,4.39937e-15,4.50001e-15,4.60449e-15,4.70706e-15,4.80741e-15,4.91125e-15,5.01257e-15,5.11155e-15,5.21138e-15,5.30624e-15,5.40009e-15,5.49547e-15]);
+r('6TSL_AOI21','acceff',[3.97215e-15,4.06616e-15,4.16124e-15,4.25977e-15,4.36307e-15,4.46507e-15,4.56903e-15,4.67268e-15,4.77939e-15,4.88671e-15,4.98851e-15,5.09232e-15,5.19409e-15,5.30111e-15]);
+r('6TSL_AOI22','acceff',[4.24082e-15,4.33661e-15,4.43591e-15,4.53984e-15,4.64689e-15,4.75296e-15,4.86366e-15,4.97142e-15,5.08491e-15,5.19137e-15,5.30323e-15,5.4095e-15,5.51651e-15,5.62559e-15]);
+r('6TSL_OAI21','acceff',[3.93763e-15,4.03315e-15,4.13186e-15,4.23407e-15,4.33906e-15,4.44615e-15,4.55339e-15,4.65996e-15,4.76789e-15,4.87333e-15,4.97769e-15,5.08263e-15,5.18491e-15,5.28836e-15]);
+r('6TSL_OAI22','acceff',[4.30324e-15,4.40365e-15,4.51058e-15,4.62003e-15,4.73436e-15,4.84774e-15,4.96218e-15,5.07997e-15,5.19306e-15,5.3098e-15,5.4239e-15,5.53672e-15,5.6479e-15,5.75932e-15]);
+r('7TSL_INV','acceff',[5.25611e-15,5.43494e-15,5.61694e-15,5.80856e-15,6.0071e-15,6.20476e-15,6.4102e-15,6.61312e-15,6.82079e-15,7.02443e-15,7.22336e-15,7.42561e-15,7.61901e-15,7.81817e-15]);
+r('7TSL_NAND2B','acceff',[4.60407e-15,4.71821e-15,4.83426e-15,4.95557e-15,5.07298e-15,5.19107e-15,5.30943e-15,5.42701e-15,5.54111e-15,5.65353e-15,5.77169e-15,5.884e-15,5.99576e-15,6.10448e-15]);
+r('7TSL_NOR2B','acceff',[4.63763e-15,4.75927e-15,4.8843e-15,5.01223e-15,5.14444e-15,5.27827e-15,5.40982e-15,5.54254e-15,5.6725e-15,5.80078e-15,5.93075e-15,6.05609e-15,6.1809e-15,6.30534e-15]);
+r('7TSL_NAND3B','acceff',[5.26225e-15,5.39356e-15,5.52874e-15,5.66453e-15,5.80146e-15,5.93416e-15,6.0746e-15,6.21002e-15,6.3434e-15,6.47538e-15,6.60307e-15,6.73119e-15,6.85724e-15,6.97774e-15]);
+r('7TSL_AOI21','acceff',[4.99906e-15,5.12544e-15,5.25763e-15,5.39363e-15,5.52957e-15,5.66818e-15,5.81267e-15,5.94909e-15,6.09168e-15,6.23071e-15,6.37228e-15,6.5122e-15,6.65157e-15,6.79213e-15]);
+r('7TSL_AOI22','acceff',[5.31612e-15,5.44777e-15,5.58584e-15,5.72647e-15,5.86699e-15,6.01152e-15,6.15954e-15,6.30453e-15,6.45345e-15,6.60088e-15,6.7452e-15,6.8908e-15,7.03607e-15,7.18246e-15]);
+r('7TSL_OAI21','acceff',[4.9613e-15,5.09322e-15,5.22933e-15,5.36981e-15,5.51273e-15,5.65766e-15,5.79749e-15,5.94514e-15,6.08666e-15,6.22936e-15,6.37563e-15,6.51742e-15,6.65716e-15,6.80014e-15]);
+r('7TSL_OAI22','acceff',[5.43351e-15,5.57358e-15,5.72087e-15,5.86977e-15,6.02231e-15,6.17789e-15,6.33473e-15,6.48959e-15,6.64716e-15,6.80362e-15,6.95689e-15,7.10871e-15,7.26227e-15,7.41309e-15]);
+r('8TSL_INV','acceff',[6.45246e-15,6.69167e-15,6.94066e-15,7.20181e-15,7.46839e-15,7.74318e-15,8.01695e-15,8.29935e-15,8.57193e-15,8.84682e-15,9.12199e-15,9.39693e-15,9.66619e-15,9.9333e-15]);
+r('8TSL_NAND2B','acceff',[5.5575e-15,5.70354e-15,5.85599e-15,6.00843e-15,6.15842e-15,6.3122e-15,6.46151e-15,6.61314e-15,6.75799e-15,6.91236e-15,7.06031e-15,7.20696e-15,7.34608e-15,7.48633e-15]);
+r('8TSL_NOR2B','acceff',[5.58906e-15,5.74405e-15,5.90415e-15,6.06953e-15,6.23547e-15,6.40374e-15,6.57042e-15,6.74208e-15,6.90775e-15,7.07376e-15,7.23882e-15,7.39918e-15,7.55448e-15,7.71036e-15]);
+r('8TSL_NAND3B','acceff',[6.3169e-15,6.47983e-15,6.65035e-15,6.82383e-15,6.99788e-15,7.17007e-15,7.34071e-15,7.512e-15,7.68038e-15,7.84795e-15,8.01367e-15,8.17713e-15,8.33289e-15,8.49751e-15]);
+r('8TSL_AOI21','acceff',[6.04395e-15,6.206e-15,6.37318e-15,6.54534e-15,6.71914e-15,6.8938e-15,7.07159e-15,7.25364e-15,7.42958e-15,7.60779e-15,7.78866e-15,7.96386e-15,8.14141e-15,8.31613e-15]);
+r('8TSL_AOI22','acceff',[6.41304e-15,6.58213e-15,6.7565e-15,6.93465e-15,7.11016e-15,7.29216e-15,7.48249e-15,7.66808e-15,7.85379e-15,8.04329e-15,8.22986e-15,8.41218e-15,8.60072e-15,8.77928e-15]);
+r('8TSL_OAI21','acceff',[6.01461e-15,6.18344e-15,6.35762e-15,6.53597e-15,6.71593e-15,6.89785e-15,7.08019e-15,7.26565e-15,7.45054e-15,7.63309e-15,7.81808e-15,7.99996e-15,8.18222e-15,8.3644e-15]);
+r('8TSL_OAI22','acceff',[6.57492e-15,6.75339e-15,6.94043e-15,7.1334e-15,7.32654e-15,7.52584e-15,7.72137e-15,7.91768e-15,8.11979e-15,8.31531e-15,8.51041e-15,8.70652e-15,8.90343e-15,9.09605e-15]);
+
+// acreff (Ohm)
+r('6TSL_INV','acreff',[2152.58,1867,1655.01,1493.09,1363.92,1260.01,1174.24,1102.79,1041.22,989.238,943.326,904.193,869.631,838.659]);
+r('6TSL_NAND2B','acreff',[4090.48,3510.41,3089.9,2770.6,2521.81,2323.21,2161.76,2027.8,1915.03,1818.95,1736.54,1667.11,1602.8,1548.31]);
+r('6TSL_NOR2B','acreff',[4503.86,3845.21,3366.79,3006.58,2726.72,2503.73,2319.24,2168.56,2040.94,1932.15,1839.62,1758.07,1687.68,1626.23]);
+r('6TSL_NAND3B','acreff',[4612.04,3920.15,3420.66,3044.31,2753.03,2522.89,2336.39,2181.14,2052.42,1943.44,1848.68,1767.85,1697.86,1635.19]);
+r('6TSL_AOI21','acreff',[5296.98,4513.73,3946.31,3515.88,3182.77,2913.33,2695.27,2516.63,2363.11,2233.13,2122.06,2025.04,1939.94,1863.66]);
+r('6TSL_AOI22','acreff',[5605.55,4766.72,4161.32,3700.4,3343.1,3059.58,2826.65,2634.31,2471.53,2333.5,2213.8,2111.29,2018.64,1938.7]);
+r('6TSL_OAI21','acreff',[5393.16,4587.42,4002.16,3562.08,3218.52,2944.49,2721.98,2539.06,2383.33,2251.92,2138.3,2039.6,1953.17,1876.38]);
+r('6TSL_OAI22','acreff',[5162.77,4395.57,3837.93,3417.54,3087.65,2825.62,2613.44,2435.5,2289.42,2161.27,2052.66,1957.91,1874.84,1801.89]);
+r('7TSL_INV','acreff',[1432.96,1248.18,1110.79,1004.7,920.442,851.766,794.759,746.787,705.783,670.576,639.859,613.584,590.076,568.727]);
+r('7TSL_NAND2B','acreff',[2578.33,2226.41,1969.81,1773.32,1620.84,1498.29,1398.36,1315.05,1244.32,1184.7,1132.92,1087.81,1047.96,1012.86]);
+r('7TSL_NOR2B','acreff',[2840.26,2440.13,2148.31,1926.44,1752.58,1613.04,1499.12,1405.18,1325.47,1258,1199.25,1148.62,1103.8,1063.39]);
+r('7TSL_NAND3B','acreff',[2903.66,2485,2179.62,1949.57,1770.22,1627.67,1510.77,1414.1,1334.24,1265.59,1206.48,1155.56,1110.07,1070.48]);
+r('7TSL_AOI21','acreff',[3338.96,2862.21,2513.39,2248.37,2040.51,1874.43,1738.36,1626.31,1530.56,1448.71,1378.68,1316.43,1261.86,1213.68]);
+r('7TSL_AOI22','acreff',[3520.32,3014.39,2643.44,2362.34,2142.65,1965.58,1822.88,1702.17,1600.97,1514,1439.85,1374.58,1314.97,1264.56]);
+r('7TSL_OAI21','acreff',[3397.74,2907.58,2550.27,2279.06,2067.39,1898.2,1760.27,1645.25,1548,1466.66,1394.1,1331.55,1276.55,1227.41]);
+r('7TSL_OAI22','acreff',[3252.13,2786.85,2444.31,2186.33,1984.24,1821.95,1688.91,1579.35,1486.02,1406.26,1338.18,1278.54,1225.72,1179.26]);
+r('8TSL_INV','acreff',[1095.51,957.818,854.387,773.517,709.563,657.019,613.739,576.806,545.814,519.075,495.303,473.974,455.632,439.174]);
+r('8TSL_NAND2B','acreff',[1901.76,1648.51,1463.62,1321.96,1211.18,1121.95,1048.61,987.445,935.742,891.856,853.929,820.593,790.265,764.874]);
+r('8TSL_NOR2B','acreff',[2087.96,1800.6,1591.06,1430.08,1305.08,1203.41,1121.17,1051.75,994.082,944.197,900.771,863.874,830.38,801.493]);
+r('8TSL_NAND3B','acreff',[2136.53,1836.42,1616.78,1450.02,1319.87,1215.9,1131.32,1061,1001.77,950.841,907.754,870.012,836.332,807.489]);
+r('8TSL_AOI21','acreff',[2448.92,2108.21,1856.39,1665.16,1515.59,1394.8,1296.63,1212.76,1143.15,1083.49,1031.31,988.023,946.666,910.845]);
+r('8TSL_AOI22','acreff',[2574.57,2214.61,1949.19,1747.05,1589.17,1461.49,1356.49,1269.04,1195.31,1131.64,1077.49,1028.79,986.801,949.565]);
+r('8TSL_OAI21','acreff',[2492.83,2144.65,1887.08,1691.79,1538.58,1416.22,1315.42,1231.35,1160.43,1100.3,1047.91,1001.59,960.808,924.545]);
+r('8TSL_OAI22','acreff',[2389.98,2056.36,1810.6,1623.61,1476.98,1358.86,1263.05,1183.01,1114.5,1056.72,1006.76,962.219,923.11,888.507]);
+// ═══════════════════════════════════════════════════════════════════
+// STATE & COLOR TABLES
+// ═══════════════════════════════════════════════════════════════════
+// vddIdx: primary VDD used by charts / KPIs (last selected)
+let vddIdx=13;
+// selectedVdds: SET of VDD indices shown as table columns (multi-select)
+let selectedVdds=new Set([13]);
+// selectedMetrics: SET of metric keys shown as table columns (multi-select)
+let selectedMetrics=new Set(['stage_delay']);
+// tableMode: 'multi_vdd' | 'multi_met' | 'full'
+let tableMode='multi_vdd';
+let showTsl={6:true,7:true,8:true};
+let showCell={INV:true,NAND2B:true,NOR2B:true,NAND3B:true,AOI21:true,AOI22:true,OAI21:true,OAI22:true};
+
+const TSL_COLOR={'6TSL':'#00d4ff','7TSL':'#bd00ff','8TSL':'#ff6b35'};
+// 8 vivid distinct colours, one per cell type — used in bar+scatter charts
+const CELL_COLOR={
+  INV:    '#00d4ff',
+  NAND2B: '#00ff9f',
+  NOR2B:  '#ffe93e',
+  NAND3B: '#ff6b35',
+  AOI21:  '#ff2d78',
+  AOI22:  '#bd00ff',
+  OAI21:  '#3ee8ff',
+  OAI22:  '#ff9500'
+};
+const METRICS_LABEL={stage_delay:'Stage Delay (ps)',iddq:'IDDQ (nA)',iddarail:'IDDArail (μA)',acceff:'ACCeff (fF)',acreff:'ACReff (Ω)'};
+const METRICS_SCALE={stage_delay:1,iddq:1e9,iddarail:1e6,acceff:1e15,acreff:1};
+const METRICS_FMT={stage_delay:v=>v.toFixed(3)+' ps',iddq:v=>v.toFixed(3)+' nA',iddarail:v=>v.toFixed(3)+' μA',acceff:v=>v.toFixed(3)+' fF',acreff:v=>v.toFixed(1)+' Ω'};
+
+// Returns the primary (first) selected metric key
+function primaryMetric(){return [...selectedMetrics][0];}
+// Returns a secondary metric for scatter Y-axis when primary is stage_delay
+const SCATTER_SECONDARY=['iddq','iddarail','acreff','acceff'];
+function scatterYMetric(xM){
+  if(xM!=='stage_delay') return 'stage_delay';
+  // primary is stage_delay — pick first selectedMetric that differs, else iddq
+  for(const m of selectedMetrics){if(m!=='stage_delay')return m;}
+  return 'iddq';
+}
+
+// chart instances
+let sweepObj=null,barObj=null,scatterObj=null,gainObj=null,s2Obj=null,s3Obj=null,accObj=null,heatObj=null;
+
+function cellTsl(c){return c.slice(0,4);}
+function cellType(c){return c.slice(5);}
+function isVisible(c){return showTsl[parseInt(cellTsl(c))]&&showCell[cellType(c)];}
+
+function fmt(v,m){
+  if(v==null||isNaN(v))return '—';
+  if(m==='stage_delay')return v.toFixed(3);
+  if(m==='acreff')return v.toFixed(1);
+  return v.toExponential(3);
+}
+
+// shared chart options helper
+function gridOpts(xTitle,yTitle){
+  return {responsive:true,animation:false,
+    plugins:{legend:{labels:{color:'#7a85a0',font:{size:11},boxWidth:12}}},
+    scales:{
+      x:{ticks:{color:'#7a85a0',font:{size:10}},grid:{color:'#1c2030'},title:{display:!!xTitle,text:xTitle,color:'#7a85a0',font:{size:10}}},
+      y:{ticks:{color:'#7a85a0',font:{size:10}},grid:{color:'#1c2030'},title:{display:!!yTitle,text:yTitle,color:'#7a85a0',font:{size:10}}}
+    }
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// VDD PILLS — multi-select for table; last clicked = vddIdx for charts
+// ═══════════════════════════════════════════════════════════════════
+function buildVddPills(){
+  const row=document.getElementById('vdd-row'); row.innerHTML='';
+  VDD.forEach((v,i)=>{
+    const b=document.createElement('button');
+    // active = selected in table; primary = the vddIdx (yellow star)
+    const isSel=selectedVdds.has(i);
+    b.className='vdd-pill'+(isSel?' active':'');
+    b.title='Click: toggle column. Ctrl+click: set as primary VDD for charts.';
+    b.innerHTML=v+'V'+(i===vddIdx?' <span style="font-size:9px;vertical-align:super">★</span>':'');
+    b.onclick=(e)=>{
+      if(e.ctrlKey||e.metaKey){
+        // Ctrl+click = set primary VDD for charts only (don't toggle column)
+        vddIdx=i;
+      } else {
+        // toggle column selection; if deselecting all, keep at least one
+        if(selectedVdds.has(i)&&selectedVdds.size>1) selectedVdds.delete(i);
+        else selectedVdds.add(i);
+        // last added = primary vddIdx for charts
+        vddIdx=i;
+      }
+      renderAll();
+    };
+    row.appendChild(b);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// KPI CARDS
+// ═══════════════════════════════════════════════════════════════════
+function buildKpis(){
+  const vals=CELLS.map(c=>({c,v:D[c].stage_delay[vddIdx]})).sort((a,b)=>a.v-b.v);
+  const fastest=vals[0], slowest=vals[vals.length-1];
+  const inv6=D['6TSL_INV'].stage_delay[vddIdx];
+  const inv8=D['8TSL_INV'].stage_delay[vddIdx];
+  const gain78=((inv6-inv8)/inv6*100).toFixed(1);
+  // avg gain across all cell types
+  const avgGain8=CELL_TYPES.reduce((s,ct)=>{
+    const b=D['6TSL_'+ct].stage_delay[vddIdx], v=D['8TSL_'+ct].stage_delay[vddIdx];
+    return s+(b-v)/b*100;
+  },0)/CELL_TYPES.length;
+  const iddq8=D['8TSL_INV'].iddq[vddIdx]*1e9, iddq6=D['6TSL_INV'].iddq[vddIdx]*1e9;
+  const iddarail8=D['8TSL_INV'].iddarail[vddIdx]*1e6, iddarail6=D['6TSL_INV'].iddarail[vddIdx]*1e6;
+  document.getElementById('kpis').innerHTML=`
+    <div class="kpi c1">
+      <div class="kpi-label">Fastest Stage Delay</div>
+      <div class="kpi-value" style="color:#ff6b35">${fastest.v.toFixed(3)} ps</div>
+      <div class="kpi-sub">${fastest.c} @ ${VDD[vddIdx]}V</div>
+    </div>
+    <div class="kpi c2">
+      <div class="kpi-label">Slowest Stage Delay</div>
+      <div class="kpi-value" style="color:#7a85a0">${slowest.v.toFixed(3)} ps</div>
+      <div class="kpi-sub">${slowest.c} @ ${VDD[vddIdx]}V</div>
+    </div>
+    <div class="kpi c3">
+      <div class="kpi-label">8TSL Speed Gain vs 6TSL — INV</div>
+      <div class="kpi-value" style="color:#00ff9f">${gain78}%</div>
+      <div class="kpi-sub">${inv6.toFixed(2)} ps → ${inv8.toFixed(2)} ps</div>
+    </div>
+    <div class="kpi c4">
+      <div class="kpi-label">Avg 8TSL Gain — All Cells</div>
+      <div class="kpi-value" style="color:#ffe93e">${avgGain8.toFixed(1)}%</div>
+      <div class="kpi-sub">averaged over all 8 cell types</div>
+    </div>
+    <div class="kpi c5">
+      <div class="kpi-label">IDDQ Penalty (8TSL INV)</div>
+      <div class="kpi-value" style="color:#ff2d78">${(iddq8/iddq6).toFixed(2)}×</div>
+      <div class="kpi-sub">${iddq6.toFixed(2)} nA → ${iddq8.toFixed(2)} nA</div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 1: Sweep line chart
+// ═══════════════════════════════════════════════════════════════════
+let sweepMetric='stage_delay';
+
+function setSweepMetric(btn){
+  sweepMetric=btn.dataset.sm;
+  document.querySelectorAll('[data-sm]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('sweep-title').textContent=METRICS_LABEL[sweepMetric]+' vs VDD — All Cells';
+  // destroy old chart so y-axis rescales for the new metric
+  if(sweepObj){sweepObj.destroy();sweepObj=null;}
+  buildSweepChart();
+}
+
+function buildSweepChart(){
+  const m=sweepMetric;
+  const yLabel=METRICS_LABEL[m];
+  // scale raw values for display (convert to sensible units)
+  const scale=m==='iddq'?1e9:m==='iddarail'?1e6:m==='acceff'?1e15:1;
+  const unit=m==='iddq'?' nA':m==='iddarail'?' μA':m==='acceff'?' fF':m==='acreff'?' Ω':' ps';
+  const yAxisLabel=m==='iddq'?'IDDQ (nA)':m==='iddarail'?'IDDArail (μA)':m==='acceff'?'ACCeff (fF)':m==='acreff'?'ACReff (Ω)':'Stage Delay (ps)';
+
+  const datasets=CELLS.filter(isVisible).map(c=>{
+    const tsl=cellTsl(c), ct=cellType(c);
+    const col=CELL_COLOR[ct];
+    const dash=tsl==='7TSL'?[6,3]:tsl==='8TSL'?[2,3]:undefined;
+    return{label:c,data:D[c][m].map(v=>v*scale),borderColor:col,backgroundColor:'transparent',
+           borderWidth:tsl==='6TSL'?2:1.5,borderDash:dash,pointRadius:2.5,tension:.3};
+  });
+  const opts=gridOpts('VDD (V)',yAxisLabel);
+  opts.plugins.legend={display:false};
+  opts.plugins.tooltip={callbacks:{
+    title:i=>'VDD = '+i[0].label,
+    label:i=>{
+      const raw=i.raw;
+      const disp=m==='stage_delay'||m==='acreff'?raw.toFixed(3):raw.toExponential(3);
+      return i.dataset.label+': '+disp+unit;
+    }
+  }};
+  if(sweepObj){sweepObj.data.datasets=datasets;sweepObj.options.scales.y.title.text=yAxisLabel;sweepObj.update();return;}
+  sweepObj=new Chart(document.getElementById('sweepChart'),
+    {type:'line',data:{labels:VDD.map(v=>v+'V'),datasets},options:opts});
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 2: Multi-VDD / Multi-Metric Table
+// ═══════════════════════════════════════════════════════════════════
+
+// Apply mode constraints to selectedVdds / selectedMetrics
+function applyModeConstraints(){
+  if(tableMode==='multi_vdd'){
+    // one metric only — keep whichever was last active
+    const m=[...selectedMetrics][selectedMetrics.size-1]||'stage_delay';
+    selectedMetrics=new Set([m]);
+    // show metric row, hide nothing
+    document.getElementById('metric-row').style.display='';
+    document.getElementById('met-hint-wrap').style.display='';
+    document.getElementById('vdd-hint').textContent='Click VDD pills to toggle columns (multiple allowed):';
+  } else if(tableMode==='multi_met'){
+    // all 5 metrics, one VDD only — keep vddIdx
+    selectedMetrics=new Set(Object.keys(METRICS_LABEL));
+    selectedVdds=new Set([vddIdx]);
+    // hide metric row (forced all)
+    document.getElementById('metric-row').style.display='none';
+    document.getElementById('met-hint-wrap').style.display='none';
+    document.getElementById('vdd-hint').textContent='Click a VDD pill to select voltage:';
+  } else { // full
+    // all metrics, keep all selected VDDs
+    selectedMetrics=new Set(Object.keys(METRICS_LABEL));
+    document.getElementById('metric-row').style.display='none';
+    document.getElementById('met-hint-wrap').style.display='none';
+    document.getElementById('vdd-hint').textContent='Click VDD pills to toggle columns:';
+  }
+  // sync metric btn visuals
+  document.querySelectorAll('[data-m]').forEach(b=>{
+    b.classList.toggle('active', selectedMetrics.has(b.dataset.m));
+  });
+}
+
+function buildMetricTable(){
+  applyModeConstraints();
+
+  const vdds=VDD.map((_,i)=>i).filter(i=>selectedVdds.has(i));
+  const metrics=[...selectedMetrics];
+  const ALL_METRICS=Object.keys(METRICS_LABEL);
+
+  // build global min/max per metric across selected VDDs (for bar colouring)
+  const rangeOf={};
+  metrics.forEach(m=>{
+    const vals=CELLS.flatMap(c=>vdds.map(vi=>D[c][m][vi]));
+    rangeOf[m]={mn:Math.min(...vals),mx:Math.max(...vals)};
+  });
+
+  // ── HEADER ──
+  const thead=document.getElementById('main-thead');
+  thead.innerHTML='';
+  const tr1=document.createElement('tr');
+  // fixed cols
+  tr1.innerHTML='<th rowspan="2">TSL</th><th rowspan="2">Cell</th>';
+
+  if(tableMode==='multi_vdd'){
+    // one metric, N VDD columns each with "vs 6TSL" sub-col
+    tr1.innerHTML+=vdds.map(vi=>`<th colspan="2" style="text-align:center;border-left:1px solid var(--border)">${VDD[vi]}V${vi===vddIdx?' ★':''}</th>`).join('');
+    const tr2=document.createElement('tr');
+    tr2.innerHTML=vdds.map(()=>`<th style="text-align:right;border-left:1px solid var(--border)">${METRICS_LABEL[metrics[0]]}</th><th style="text-align:right">vs 6TSL</th>`).join('');
+    thead.appendChild(tr1); thead.appendChild(tr2);
+  } else if(tableMode==='multi_met'){
+    // N metric cols at one VDD
+    tr1.innerHTML+=metrics.map(m=>`<th style="text-align:right;border-left:1px solid var(--border)">${METRICS_LABEL[m]}</th>`).join('');
+    tr1.innerHTML+=metrics.map(m=>`<th style="text-align:right">vs 6TSL</th>`).join('');
+    // collapse to single header row
+    // actually put value+vs6TSL side by side per metric in one row
+    thead.innerHTML='';
+    const hdr=document.createElement('tr');
+    hdr.innerHTML='<th>TSL</th><th>Cell</th>';
+    metrics.forEach(m=>{
+      hdr.innerHTML+=`<th style="text-align:right;border-left:1px solid var(--border)">${METRICS_LABEL[m]}</th>`;
+      hdr.innerHTML+=`<th style="text-align:right;font-size:10px;color:var(--muted)">vs 6TSL</th>`;
+    });
+    thead.appendChild(hdr);
+  } else {
+    // full: metrics as top-level groups, VDDs as sub-cols
+    metrics.forEach((m,mi)=>{
+      tr1.innerHTML+=`<th colspan="${vdds.length}" style="text-align:center;border-left:2px solid var(--border);color:var(--text)">${METRICS_LABEL[m]}</th>`;
+    });
+    const tr2=document.createElement('tr');
+    metrics.forEach(m=>{
+      vdds.forEach(vi=>{
+        tr2.innerHTML+=`<th style="text-align:right;border-left:1px solid var(--border);font-size:10px">${VDD[vi]}V${vi===vddIdx?' ★':''}</th>`;
+      });
+    });
+    thead.appendChild(tr1); thead.appendChild(tr2);
+  }
+
+  // ── BODY ──
+  const tb=document.getElementById('metric-tbody'); tb.innerHTML='';
+
+  ['6TSL','7TSL','8TSL'].forEach(tsl=>{
+    if(!showTsl[parseInt(tsl)])return;
+    const span=tableMode==='multi_vdd'? vdds.length*2+2 : tableMode==='multi_met'? metrics.length*2+2 : metrics.length*vdds.length+2;
+    const hdr=document.createElement('tr');
+    hdr.innerHTML=`<td colspan="${span}" style="background:${TSL_COLOR[tsl]}10;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:${TSL_COLOR[tsl]};padding:6px 12px;border-top:2px solid ${TSL_COLOR[tsl]}35">${tsl}</td>`;
+    tb.appendChild(hdr);
+
+    CELL_TYPES.filter(ct=>showCell[ct]).forEach(ct=>{
+      const c=tsl+'_'+ct;
+      const tr=document.createElement('tr');
+      let html=`<td><span class="chip chip${parseInt(tsl)}">${tsl}</span></td>
+                <td style="font-weight:600;color:${CELL_COLOR[ct]}">${ct}</td>`;
+
+      if(tableMode==='multi_vdd'){
+        const m=metrics[0];
+        const {mn,mx}=rangeOf[m];
+        vdds.forEach(vi=>{
+          const v=D[c][m][vi];
+          const base6=D['6TSL_'+ct]?.[m]?.[vi]??null;
+          const pct=base6!=null&&tsl!=='6TSL'?((base6-v)/base6*100):null;
+          const pctStr=pct!=null?`<span style="color:${pct>0?'#00ff9f':'#ff2d78'}">${pct>0?'↓':'↑'}${Math.abs(pct).toFixed(1)}%</span>`:'—';
+          const t=(v-mn)/(mx-mn||1);
+          const col=`hsl(${200-t*150},100%,62%)`;
+          const pct2=Math.round(t*100);
+          html+=`<td class="mono" style="text-align:right;color:${col};border-left:1px solid var(--border)">${fmt(v,m)}</td>
+                 <td style="text-align:right;font-size:11px">${pctStr}</td>`;
+        });
+      } else if(tableMode==='multi_met'){
+        const vi=vdds[0]??vddIdx;
+        metrics.forEach(m=>{
+          const {mn,mx}=rangeOf[m];
+          const v=D[c][m][vi];
+          const base6=D['6TSL_'+ct]?.[m]?.[vi]??null;
+          const pct=base6!=null&&tsl!=='6TSL'?((base6-v)/base6*100):null;
+          const pctStr=pct!=null?`<span style="color:${pct>0?'#00ff9f':'#ff2d78'}">${pct>0?'↓':'↑'}${Math.abs(pct).toFixed(1)}%</span>`:'—';
+          const t=(v-mn)/(mx-mn||1);
+          const col=`hsl(${200-t*150},100%,62%)`;
+          html+=`<td class="mono" style="text-align:right;color:${col};border-left:1px solid var(--border)">${fmt(v,m)}</td>
+                 <td style="text-align:right;font-size:11px">${pctStr}</td>`;
+        });
+      } else {
+        // full
+        metrics.forEach(m=>{
+          const {mn,mx}=rangeOf[m];
+          vdds.forEach(vi=>{
+            const v=D[c][m][vi];
+            const t=(v-mn)/(mx-mn||1);
+            const col=`hsl(${200-t*150},100%,62%)`;
+            html+=`<td class="mono" style="text-align:right;color:${col};border-left:1px solid var(--border)">${fmt(v,m)}</td>`;
+          });
+        });
+      }
+
+      tr.innerHTML=html;
+      tb.appendChild(tr);
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 3: Correlation charts
+// ═══════════════════════════════════════════════════════════════════
+
+function setChartLabel(id,title,sub){
+  document.getElementById(id+'-title').textContent=title;
+  document.getElementById(id+'-sub').textContent=sub;
+}
+
+// 3a. Bar: primary selected metric by cell at selected VDD
+function buildBarChart(){
+  const m=primaryMetric();
+  const sc=METRICS_SCALE[m];
+  const ml=METRICS_LABEL[m];
+  const vddLabel=VDD[vddIdx]+'V';
+  setChartLabel('barChart',
+    ml+' by Cell — at '+vddLabel,
+    'All visible cells grouped by TSL tier, coloured by cell type');
+  const visible=CELLS.filter(isVisible);
+  const labels=visible.map(c=>cellTsl(c)+' '+cellType(c));
+  const vals=visible.map(c=>D[c][m][vddIdx]*sc);
+  const colors=visible.map(c=>CELL_COLOR[cellType(c)]);
+  const borders=visible.map(c=>TSL_COLOR[cellTsl(c)]);
+  const fmtFn=METRICS_FMT[m];
+  if(barObj){barObj.destroy();barObj=null;}
+  const cfg={type:'bar',
+    data:{labels,datasets:[{label:ml,data:vals,backgroundColor:colors.map(c=>c+'bb'),
+          borderColor:borders,borderWidth:2,borderRadius:4}]},
+    options:{...gridOpts('',ml),
+      plugins:{legend:{display:false},
+        tooltip:{callbacks:{label:i=>visible[i.dataIndex]+': '+fmtFn(i.raw)}}}}};
+  cfg.options.scales.x.ticks.maxRotation=60;
+  barObj=new Chart(document.getElementById('barChart'),cfg);
+}
+
+// 3b. Scatter: Y = primary metric, X = stage_delay (or secondary if primary IS stage_delay)
+function buildScatter(){
+  const pm=primaryMetric();
+  const xM='stage_delay';
+  const yM= pm==='stage_delay' ? scatterYMetric(pm) : pm;
+  const xSc=METRICS_SCALE[xM], ySc=METRICS_SCALE[yM];
+  const xL=METRICS_LABEL[xM], yL=METRICS_LABEL[yM];
+  const vddLabel=VDD[vddIdx]+'V';
+  setChartLabel('scatterChart',
+    yL+' vs '+xL+' — at '+vddLabel,
+    'Each point = 1 cell at '+vddLabel+'. Shape = TSL tier.');
+  const datasets=['6TSL','7TSL','8TSL'].map(tsl=>{
+    const pts=CELLS.filter(c=>cellTsl(c)===tsl&&isVisible(c))
+      .map(c=>({x:D[c][xM][vddIdx]*xSc,y:D[c][yM][vddIdx]*ySc,label:c,ct:cellType(c)}));
+    return{label:tsl,data:pts,backgroundColor:pts.map(p=>CELL_COLOR[p.ct]+'bb'),
+      borderColor:pts.map(p=>TSL_COLOR[tsl]),pointRadius:8,pointHoverRadius:10,
+      pointStyle:tsl==='6TSL'?'circle':tsl==='7TSL'?'triangle':'rect'};
+  });
+  const opts=gridOpts(xL,yL);
+  opts.plugins.tooltip={callbacks:{label:i=>`${i.raw.label}: ${METRICS_FMT[xM](i.raw.x)}, ${METRICS_FMT[yM](i.raw.y)}`}};
+  opts.plugins.legend.labels.generateLabels=()=>[
+    {text:'6TSL (circle)',fillStyle:'#00d4ff',strokeStyle:'#00d4ff',pointStyle:'circle'},
+    {text:'7TSL (triangle)',fillStyle:'#bd00ff',strokeStyle:'#bd00ff',pointStyle:'triangle'},
+    {text:'8TSL (square)',fillStyle:'#ff6b35',strokeStyle:'#ff6b35',pointStyle:'rect'}
+  ];
+  if(scatterObj){scatterObj.destroy();scatterObj=null;}
+  scatterObj=new Chart(document.getElementById('scatterChart'),{type:'scatter',data:{datasets},options:opts});
+}
+
+// 3c. Gain bar: % gain over 6TSL baseline using primary metric at selected VDD
+function buildGainChart(){
+  const m=primaryMetric();
+  const sc=METRICS_SCALE[m];
+  const ml=METRICS_LABEL[m];
+  const vddLabel=VDD[vddIdx]+'V';
+  const higherIsBetter=m==='acreff';
+  const g7=CELL_TYPES.map(ct=>{
+    const b=D['6TSL_'+ct][m][vddIdx]*sc, v=D['7TSL_'+ct][m][vddIdx]*sc;
+    return higherIsBetter?(v-b)/b*100:(b-v)/b*100;
+  });
+  const g8=CELL_TYPES.map(ct=>{
+    const b=D['6TSL_'+ct][m][vddIdx]*sc, v=D['8TSL_'+ct][m][vddIdx]*sc;
+    return higherIsBetter?(v-b)/b*100:(b-v)/b*100;
+  });
+  const gainLabel=higherIsBetter?'Gain over 6TSL (%)':'Improvement over 6TSL (%)';
+  setChartLabel('gainChart',
+    ml+' — 7TSL & 8TSL vs 6TSL Baseline (%) at '+vddLabel,
+    'How much 7TSL and 8TSL '+(higherIsBetter?'exceed':'improve over')+' 6TSL per cell type at '+vddLabel);
+  const opts=gridOpts('',gainLabel);
+  opts.scales.y.ticks.callback=v=>v.toFixed(1)+'%';
+  opts.plugins.legend.display=true;
+  opts.plugins.tooltip={callbacks:{label:i=>i.dataset.label+': '+i.raw.toFixed(2)+'%'}};
+  const datasets=[
+    {label:'7TSL vs 6TSL',data:g7,backgroundColor:'#bd00ff99',borderColor:'#bd00ff',borderWidth:2,borderRadius:5},
+    {label:'8TSL vs 6TSL',data:g8,backgroundColor:'#ff6b3599',borderColor:'#ff6b35',borderWidth:2,borderRadius:5}
+  ];
+  if(gainObj){gainObj.destroy();gainObj=null;}
+  gainObj=new Chart(document.getElementById('gainChart'),{type:'bar',data:{labels:CELL_TYPES,datasets},options:opts});
+}
+
+// 3d. Scatter: X=stage_delay, Y=secondary selected metric
+function buildScatter2(){
+  const pm=primaryMetric();
+  let yM='iddarail';
+  if(pm==='iddarail'){yM='iddq';}
+  else if(selectedMetrics.size>1){for(const m of selectedMetrics){if(m!==pm){yM=m;break;}}}
+  const xM='stage_delay';
+  const xSc=METRICS_SCALE[xM], ySc=METRICS_SCALE[yM];
+  const xL=METRICS_LABEL[xM], yL=METRICS_LABEL[yM];
+  const vddLabel=VDD[vddIdx]+'V';
+  setChartLabel('scatter2Chart',
+    yL+' vs '+xL+' — at '+vddLabel,
+    'Trade-off scatter at '+vddLabel+'. Each point = 1 cell.');
+  const datasets=['6TSL','7TSL','8TSL'].map(tsl=>{
+    const pts=CELLS.filter(c=>cellTsl(c)===tsl&&isVisible(c))
+      .map(c=>({x:D[c][xM][vddIdx]*xSc,y:D[c][yM][vddIdx]*ySc,label:c,ct:cellType(c)}));
+    return{label:tsl,data:pts,backgroundColor:pts.map(p=>CELL_COLOR[p.ct]+'bb'),
+      borderColor:pts.map(p=>TSL_COLOR[tsl]),pointRadius:8,pointHoverRadius:10};
+  });
+  const opts=gridOpts(xL,yL);
+  opts.plugins.tooltip={callbacks:{label:i=>`${i.raw.label}: ${METRICS_FMT[xM](i.raw.x)}, ${METRICS_FMT[yM](i.raw.y)}`}};
+  if(s2Obj){s2Obj.destroy();s2Obj=null;}
+  s2Obj=new Chart(document.getElementById('scatter2Chart'),{type:'scatter',data:{datasets},options:opts});
+}
+
+// 3e. Scatter: X=stage_delay, Y=tertiary selected metric
+function buildScatter3(){
+  const pm=primaryMetric();
+  let yM='acreff';
+  if(pm==='acreff'){yM='iddq';}
+  else if(selectedMetrics.size>1){
+    const sel=[...selectedMetrics].filter(m=>m!=='stage_delay'&&m!==([...selectedMetrics][0]));
+    if(sel.length)yM=sel[sel.length-1];
+  }
+  const xM='stage_delay';
+  const xSc=METRICS_SCALE[xM], ySc=METRICS_SCALE[yM];
+  const xL=METRICS_LABEL[xM], yL=METRICS_LABEL[yM];
+  const vddLabel=VDD[vddIdx]+'V';
+  setChartLabel('scatter3Chart',
+    yL+' vs '+xL+' — at '+vddLabel,
+    'Trade-off scatter at '+vddLabel+'. Each point = 1 cell.');
+  const datasets=['6TSL','7TSL','8TSL'].map(tsl=>{
+    const pts=CELLS.filter(c=>cellTsl(c)===tsl&&isVisible(c))
+      .map(c=>({x:D[c][xM][vddIdx]*xSc,y:D[c][yM][vddIdx]*ySc,label:c,ct:cellType(c)}));
+    return{label:tsl,data:pts,backgroundColor:pts.map(p=>CELL_COLOR[p.ct]+'bb'),
+      borderColor:pts.map(p=>TSL_COLOR[tsl]),pointRadius:8,pointHoverRadius:10};
+  });
+  const opts=gridOpts(xL,yL);
+  opts.plugins.tooltip={callbacks:{label:i=>`${i.raw.label}: ${METRICS_FMT[xM](i.raw.x)}, ${METRICS_FMT[yM](i.raw.y)}`}};
+  if(s3Obj){s3Obj.destroy();s3Obj=null;}
+  s3Obj=new Chart(document.getElementById('scatter3Chart'),{type:'scatter',data:{datasets},options:opts});
+}
+
+// 3f. Line chart: primary metric vs VDD for all visible cells
+function buildAccChart(){
+  const m=primaryMetric();
+  const sc=METRICS_SCALE[m];
+  const ml=METRICS_LABEL[m];
+  setChartLabel('accChart',
+    ml+' vs VDD — All Visible Cells',
+    'Full voltage sweep ('+VDD[0]+'V – '+VDD[VDD.length-1]+'V). Selected VDD ★ = '+VDD[vddIdx]+'V.');
+  const datasets=CELLS.filter(isVisible).map(c=>{
+    const tsl=cellTsl(c), ct=cellType(c);
+    const col=CELL_COLOR[ct];
+    const dash=tsl==='7TSL'?[6,3]:tsl==='8TSL'?[2,3]:undefined;
+    return{label:c,data:D[c][m].map(v=>v*sc),borderColor:col,backgroundColor:'transparent',
+           borderWidth:tsl==='6TSL'?2:1.5,borderDash:dash,pointRadius:2,tension:.3};
+  });
+  const opts=gridOpts('VDD (V)',ml);
+  opts.plugins.legend={display:false};
+  opts.plugins.tooltip={callbacks:{title:i=>'VDD = '+i[0].label,label:i=>i.dataset.label+': '+METRICS_FMT[m](i.raw)}};
+  if(accObj){accObj.destroy();accObj=null;}
+  accObj=new Chart(document.getElementById('accChart'),{type:'line',data:{labels:VDD.map(v=>v+'V'),datasets},options:opts});
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 4: Key Observations
+// ═══════════════════════════════════════════════════════════════════
+function buildObs(){
+  const inv6=D['6TSL_INV'].stage_delay, inv7=D['7TSL_INV'].stage_delay, inv8=D['8TSL_INV'].stage_delay;
+  const g7avg=(inv6.reduce((s,v,i)=>s+(v-inv7[i])/v*100,0)/14).toFixed(1);
+  const g8avg=(inv6.reduce((s,v,i)=>s+(v-inv8[i])/v*100,0)/14).toFixed(1);
+  const inv6v=inv6[vddIdx];
+  const aoi22ratio=(D['6TSL_AOI22'].stage_delay[vddIdx]/inv6v).toFixed(2);
+  const iddq6=D['6TSL_INV'].iddq[vddIdx]*1e9, iddq8=D['8TSL_INV'].iddq[vddIdx]*1e9;
+  const rail6=D['6TSL_INV'].iddarail[vddIdx]*1e6, rail8=D['8TSL_INV'].iddarail[vddIdx]*1e6;
+  const acc6=D['6TSL_INV'].acceff[vddIdx]*1e15, acc8=D['8TSL_INV'].acceff[vddIdx]*1e15;
+  const acr6=D['6TSL_INV'].acreff[vddIdx], acr8=D['8TSL_INV'].acreff[vddIdx];
+  const vSens=((inv6[0]-inv6[13])/inv6[0]*100).toFixed(1);
+  document.getElementById('obs-grid').innerHTML=`
+    <div class="obs-card"><h4>TSL Speed Advantage — INV (avg over 14 VDD pts)</h4>
+      <div class="obs-row"><span>7TSL vs 6TSL</span><span class="pos">↓${g7avg}% faster</span></div>
+      <div class="obs-row"><span>8TSL vs 6TSL</span><span class="pos">↓${g8avg}% faster</span></div>
+    </div>
+    <div class="obs-card"><h4>Cell Complexity vs Delay @ ${VDD[vddIdx]}V</h4>
+      <div class="obs-row"><span>6TSL INV baseline</span><span class="neu">${inv6v.toFixed(2)} ps</span></div>
+      <div class="obs-row"><span>6TSL AOI22 / INV ratio</span><span class="neg">${aoi22ratio}×</span></div>
+      <div class="obs-row"><span>INV = fastest all tiers</span><span class="pos">✓</span></div>
+    </div>
+    <div class="obs-card"><h4>Power Trade-off @ ${VDD[vddIdx]}V — INV</h4>
+      <div class="obs-row"><span>IDDQ penalty (8TSL)</span><span class="neg">${(iddq8/iddq6).toFixed(2)}× (${iddq6.toFixed(1)}→${iddq8.toFixed(1)} nA)</span></div>
+      <div class="obs-row"><span>IDDArail penalty (8TSL)</span><span class="neg">${(rail8/rail6).toFixed(2)}× (${rail6.toFixed(1)}→${rail8.toFixed(1)} μA)</span></div>
+    </div>
+    <div class="obs-card"><h4>Capacitance & Resistance @ ${VDD[vddIdx]}V — INV</h4>
+      <div class="obs-row"><span>ACCeff 6TSL→8TSL</span><span class="neg">${acc6.toFixed(2)}→${acc8.toFixed(2)} fF (+${((acc8-acc6)/acc6*100).toFixed(1)}%)</span></div>
+      <div class="obs-row"><span>ACReff 6TSL→8TSL</span><span class="pos">${acr6.toFixed(0)}→${acr8.toFixed(0)} Ω (−${((acr6-acr8)/acr6*100).toFixed(1)}%)</span></div>
+    </div>
+    <div class="obs-card"><h4>VDD Sensitivity — 6TSL INV</h4>
+      <div class="obs-row"><span>@ 0.5V</span><span class="neu">${inv6[0].toFixed(2)} ps</span></div>
+      <div class="obs-row"><span>@ 1.15V</span><span class="pos">${inv6[13].toFixed(2)} ps</span></div>
+      <div class="obs-row"><span>0.5→1.15V improvement</span><span class="pos">↓${vSens}%</span></div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════════════════════════════
+function toggleTsl(n){
+  showTsl[n]=!showTsl[n];
+  const b=document.getElementById('f'+n);
+  if(showTsl[n]){b.classList.add('active');if(n===7)b.classList.add('p');if(n===8)b.classList.add('o');}
+  else b.classList.remove('active','p','o');
+  renderAll();
+}
+function toggleCell(ct){
+  showCell[ct]=!showCell[ct];
+  document.getElementById('fc'+ct).classList.toggle('active',showCell[ct]);
+  renderAll();
+}
+function resetFilters(){
+  showTsl={6:true,7:true,8:true};
+  showCell=Object.fromEntries(CELL_TYPES.map(ct=>[ct,true]));
+  document.querySelectorAll('[id^="f"]:not([id^="fc"])').forEach(b=>{b.classList.add('active');});
+  document.getElementById('f7').classList.add('p'); document.getElementById('f8').classList.add('o');
+  CELL_TYPES.forEach(ct=>document.getElementById('fc'+ct).classList.add('active'));
+  renderAll();
+}
+function setMode(m){
+  tableMode=m;
+  document.querySelectorAll('[id^="mode-"]').forEach(b=>b.classList.remove('active'));
+  document.getElementById('mode-'+{multi_vdd:'mv',multi_met:'mm',full:'full'}[m]).classList.add('active');
+  buildMetricTable();
+  buildVddPills();
+}
+function toggleMetric(btn){
+  const m=btn.dataset.m;
+  if(tableMode!=='multi_vdd') return; // only meaningful in multi_vdd mode
+  if(selectedMetrics.has(m)&&selectedMetrics.size>1) selectedMetrics.delete(m);
+  else selectedMetrics.add(m);
+  renderAll();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════════
+function renderAll(){
+  buildKpis();
+  buildVddPills();
+  buildSweepChart();
+  buildMetricTable();
+  buildBarChart();
+  buildScatter();
+  buildGainChart();
+  buildScatter2();
+  buildScatter3();
+  buildAccChart();
+  buildObs();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SIMULATION METADATA — single source of truth for both datasets.
+// Update these objects when technology, model, VDD, temp or corner
+// changes. Every title, badge, subtitle and label derives from here.
+// ═══════════════════════════════════════════════════════════════════
+
+// Single Stage VDD sweep dataset
+const SINGLE_META={
+  technology:  'v0.6SB2 (Spice-260604-sandbox)',
+  simulator:   'HSPICE T-2022.06-SP2',
+  vdd_range:   '0.5 V – 1.15 V',
+  vdd_pts:     14,
+  temp:        '25 °C',
+  corner:      'TT',
+  tsl_flavors: '6TSL / 7TSL / 8TSL',
+  vt_flavor:   'ULVT',
+  n_cells:     24,
+  n_sims:      336,
+  n_metrics:   5,
+};
+
+// 101-stage chain dataset
+const CHAIN_META={
+  technology:  'v0.6SB2 (Spice-260604-sandbox)',
+  simulator:   'HSPICE T-2022.06-SP2',
+  vdd:         '0.70 V',
+  temp:        '25 °C',
+  corner:      'TT',
+  stages:      101,
+  vt_flavor:   '7TSL SLVT',
+  n_metrics:   4,
+  // Metrics multiplied/divided by STAGES when computing raw/norm views.
+  // ACReff is an intrinsic V/I ratio — never scaled.
+  // To add a new scalable metric: add its key to scalable_metrics only.
+  scalable_metrics:  ['stage_delay','ceff','iddq'],
+  per_stage_metrics: ['acreff'],
+};
+
+// ─── Auto-derived raw cell array ─────────────────────────────────────────────
+// CHAIN_CELLS holds per-stage values exactly as HSPICE .measure reports them.
+// CHAIN_CELLS_RAW scales scalable metrics back up by STAGES (×101) to give
+// the true full-ring totals before HSPICE internal division.
+function scaleChainCell(c, factor){
+  const sm=CHAIN_META.scalable_metrics;
+  const out={label:c.label};
+  for(const k of Object.keys(c)){
+    if(k==='label') continue;
+    out[k] = sm.includes(k) ? c[k]*factor : c[k];
+  }
+  return out;
+}
+
+// Derived condition strings
+function singleCondStr(){
+  const m=SINGLE_META;
+  return `${m.simulator} \u00b7 Technology ${m.technology} ${m.vt_flavor} \u00b7 ${m.corner} Corner \u00b7 T\u202f=\u202f${m.temp}`;
+}
+function chainCondStr(){
+  const m=CHAIN_META;
+  return `VDD\u202f=\u202f${m.vdd} \u00b7 T\u202f=\u202f${m.temp} \u00b7 ${m.corner} Corner \u00b7 ${m.stages} stages \u00b7 ${m.technology} model \u00b7 ${m.vt_flavor}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 101-STAGE CHAIN — SIMULATION DATA
+// ═══════════════════════════════════════════════════════════════════
+const CHAIN_CELLS=[
+  {label:'7TSL_INVX2', stage_delay:6.88577, ceff:5.45788, acreff:1.26162, iddq:12.61346},
+  {label:'7TSL_NAND2B',stage_delay:10.70516,ceff:4.85153, acreff:2.20655, iddq:9.03332},
+  {label:'7TSL_NAND2T',stage_delay:10.21789,ceff:4.60155, acreff:2.22053, iddq:9.18992},
+  {label:'7TSL_NAND3B',stage_delay:13.32600,ceff:5.46193, acreff:2.43980, iddq:11.04141},
+  {label:'7TSL_NAND3T',stage_delay:12.77663,ceff:5.04378, acreff:2.53315, iddq:11.28430},
+  {label:'7TSL_NOR2B', stage_delay:11.69318,ceff:4.90393, acreff:2.38445, iddq:9.90899},
+  {label:'7TSL_NOR2T', stage_delay:10.97145,ceff:4.60546, acreff:2.38227, iddq:10.02576}
+];
+
+const CHAIN_COLORS=['#00d4ff','#00ff9f','#ffe93e','#ff6b35','#ff2d78','#bd00ff','#3ee8ff'];
+
+// Derived raw dataset — always recomputed from CHAIN_CELLS + CHAIN_META
+const CHAIN_CELLS_RAW = CHAIN_CELLS.map(c=>scaleChainCell(c, CHAIN_META.stages));
+
+let chainRawChartsBuilt=false;
+let chainChartsBuilt=false;
+
+// ─── Shared bar-chart options factory ────────────────────────────────────────
+function chainBarOpts(yLabel){
+  return {
+    responsive:true,animation:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:i=>i.dataset.label+': '+Number(i.raw).toFixed(4)}}},
+    scales:{
+      x:{ticks:{color:'#7a85a0',font:{size:10},maxRotation:45},grid:{color:'#1c2030'}},
+      y:{ticks:{color:'#7a85a0',font:{size:10}},grid:{color:'#1c2030'},
+         title:{display:true,text:yLabel,color:'#7a85a0',font:{size:10}}}
+    }
+  };
+}
+
+// ─── ② Raw ring oscillator totals (CHAIN_CELLS × STAGES) ─────────────────────
+function buildChainRawView(){
+  const m=CHAIN_META;
+  const n=m.stages;
+  document.getElementById('chain-raw-conditions').textContent=
+    chainCondStr()+` \u00b7 scalable metrics \u00d7${n} (raw ring totals)`;
+  document.getElementById('chain-raw-stages-note').textContent=`STAGES\u202f=\u202f${n}`;
+  document.getElementById('chain-raw-sub-delay').textContent=
+    `Total ring oscillator delay (ps) = stage_delay \u00d7 ${n} \u00b7 VDD\u202f=\u202f${m.vdd} \u00b7 ${m.corner} \u00b7 ${m.technology}`;
+  document.getElementById('chain-raw-sub-ceff').textContent=
+    `Total ring Ceff (fF) = ceff \u00d7 ${n} \u00b7 ${m.vt_flavor} \u00b7 ${m.technology}`;
+  document.getElementById('chain-raw-sub-acreff').textContent=
+    `ACReff (K\u03a9) \u2014 intrinsic V/I ratio, not scaled \u00b7 ${m.vt_flavor} \u00b7 VDD\u202f=\u202f${m.vdd}`;
+  document.getElementById('chain-raw-sub-iddq').textContent=
+    `Total ring IDDQ (nA) = iddq \u00d7 ${n} \u00b7 ${m.vt_flavor} \u00b7 VDD\u202f=\u202f${m.vdd} \u00b7 ${m.corner}`;
+
+  const tbody=document.getElementById('chain-raw-tbody');
+  const maxSD=Math.max(...CHAIN_CELLS_RAW.map(c=>c.stage_delay));
+  tbody.innerHTML=CHAIN_CELLS_RAW.map((c,i)=>`
+    <tr>
+      <td><span class="chip chip7">${c.label}</span></td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="mono">${c.stage_delay.toFixed(2)}</span>
+          <div class="bar-track"><div class="bar-fill" style="width:${(c.stage_delay/maxSD*100).toFixed(1)}%;background:${CHAIN_COLORS[i]}"></div></div>
+        </div>
+      </td>
+      <td class="mono">${c.ceff.toFixed(2)}</td>
+      <td class="mono">${c.acreff.toFixed(5)}</td>
+      <td class="mono">${c.iddq.toFixed(2)}</td>
+    </tr>`).join('');
+
+  if(chainRawChartsBuilt) return;
+  chainRawChartsBuilt=true;
+
+  const labels=CHAIN_CELLS_RAW.map(c=>c.label);
+  const colors=CHAIN_COLORS;
+
+  new Chart(document.getElementById('chain-raw-delay'),{type:'bar',
+    data:{labels,datasets:[{label:`Total Ring Delay (ps) [×${n}]`,data:CHAIN_CELLS_RAW.map(c=>c.stage_delay),
+      backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:4}]},
+    options:chainBarOpts(`Total Ring Delay (ps) [\u00d7${n}]`)});
+
+  new Chart(document.getElementById('chain-raw-ceff'),{type:'bar',
+    data:{labels,datasets:[{label:`Total Ceff (fF) [×${n}]`,data:CHAIN_CELLS_RAW.map(c=>c.ceff),
+      backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:4}]},
+    options:chainBarOpts(`Total Ceff (fF) [\u00d7${n}]`)});
+
+  new Chart(document.getElementById('chain-raw-acreff'),{type:'bar',
+    data:{labels,datasets:[{label:'ACReff (KΩ) [intrinsic — not scaled]',data:CHAIN_CELLS_RAW.map(c=>c.acreff),
+      backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:4}]},
+    options:chainBarOpts('ACReff (K\u03a9) [intrinsic \u2014 not scaled]')});
+
+  new Chart(document.getElementById('chain-raw-iddq'),{type:'bar',
+    data:{labels,datasets:[{label:`Total IDDQ (nA) [×${n}]`,data:CHAIN_CELLS_RAW.map(c=>c.iddq),
+      backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:4}]},
+    options:chainBarOpts(`Total IDDQ (nA) [\u00d7${n}]`)});
+}
+
+// ─── ③ Per-stage values (as reported by HSPICE) ───────────────────────────────
+function buildChainView(){
+  const m=CHAIN_META;
+  document.getElementById('chain-conditions').textContent=chainCondStr();
+  document.getElementById('chain-sub-delay').textContent=
+    `Stage delay (ps) = delay2\u202f\u00f7\u202f(2\u00d7STAGES) \u00b7 VDD\u202f=\u202f${m.vdd} \u00b7 ${m.corner} \u00b7 ${m.technology}`;
+  document.getElementById('chain-sub-ceff').textContent=
+    `Effective switching capacitance per stage (fF) \u00b7 ${m.vt_flavor} \u00b7 ${m.technology}`;
+  document.getElementById('chain-sub-acreff').textContent=
+    `ACReff (K\u03a9) \u2014 intrinsic V/I ratio, not scaled \u00b7 ${m.vt_flavor} \u00b7 VDD\u202f=\u202f${m.vdd}`;
+  document.getElementById('chain-sub-iddq').textContent=
+    `IDDQ per stage (nA) = iddq_avg\u202f\u00f7\u202fSTAGES \u00b7 ${m.vt_flavor} \u00b7 VDD\u202f=\u202f${m.vdd} \u00b7 ${m.corner}`;
+
+  const tbody=document.getElementById('chain-tbody');
+  const maxSD=Math.max(...CHAIN_CELLS.map(c=>c.stage_delay));
+  tbody.innerHTML=CHAIN_CELLS.map((c,i)=>`
+    <tr>
+      <td><span class="chip chip7">${c.label}</span></td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="mono">${c.stage_delay.toFixed(3)}</span>
+          <div class="bar-track"><div class="bar-fill" style="width:${(c.stage_delay/maxSD*100).toFixed(1)}%;background:${CHAIN_COLORS[i]}"></div></div>
+        </div>
+      </td>
+      <td class="mono">${c.ceff.toFixed(3)}</td>
+      <td class="mono">${c.acreff.toFixed(5)}</td>
+      <td class="mono">${c.iddq.toFixed(3)}</td>
+    </tr>`).join('');
+
+  if(chainChartsBuilt) return;
+  chainChartsBuilt=true;
+
+  const labels=CHAIN_CELLS.map(c=>c.label);
+  const colors=CHAIN_COLORS;
+
+  new Chart(document.getElementById('chain-delay'),{type:'bar',
+    data:{labels,datasets:[{label:'Stage Delay (ps) [\u00f7(2\u00d7STAGES)]',data:CHAIN_CELLS.map(c=>c.stage_delay),
+      backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:4}]},
+    options:chainBarOpts('Stage Delay (ps) [\u00f7(2\u00d7STAGES)]')});
+
+  new Chart(document.getElementById('chain-ceff'),{type:'bar',
+    data:{labels,datasets:[{label:'Ceff (fF) [per stage]',data:CHAIN_CELLS.map(c=>c.ceff),
+      backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:4}]},
+    options:chainBarOpts('Ceff (fF) [per stage]')});
+
+  new Chart(document.getElementById('chain-acreff'),{type:'bar',
+    data:{labels,datasets:[{label:'ACReff (K\u03a9) [intrinsic]',data:CHAIN_CELLS.map(c=>c.acreff),
+      backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:4}]},
+    options:chainBarOpts('ACReff (K\u03a9) [intrinsic]')});
+
+  new Chart(document.getElementById('chain-iddq'),{type:'bar',
+    data:{labels,datasets:[{label:'IDDQ/stage (nA) [\u00f7STAGES]',data:CHAIN_CELLS.map(c=>c.iddq),
+      backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:4}]},
+    options:chainBarOpts('IDDQ/stage (nA) [\u00f7STAGES]')});
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// COMPARISON VIEW — Single Stage (VDD sweep) vs Chain Per-Stage @ 0.70V
+// getCompVddIdx() finds the VDD array index matching CHAIN_META.vdd
+// automatically — works for any future chain VDD value.
+// getCorrPairs() maps chain cell labels to their single-INV equivalents.
+// Chain values come from CHAIN_CELLS (per-stage as reported by HSPICE).
+// ═══════════════════════════════════════════════════════════════════
+let corrChartsBuilt=false;
+
+function getCompVddIdx(){
+  const target=parseFloat(CHAIN_META.vdd);
+  let best=0,bestDiff=Infinity;
+  VDD.forEach((v,i)=>{const d=Math.abs(v-target);if(d<bestDiff){bestDiff=d;best=i;}});
+  return best;
+}
+
+// Map chain cell type suffixes → single-INV cell type key.
+// INVX2/INV→INV, NAND2B/NAND2T→NAND2B, NAND3B/NAND3T→NAND3B, NOR2B/NOR2T→NOR2B
+const CHAIN_TO_SINGLE={'INVX2':'INV','INV':'INV','NAND2B':'NAND2B','NAND2T':'NAND2B',
+                        'NAND3B':'NAND3B','NAND3T':'NAND3B','NOR2B':'NOR2B','NOR2T':'NOR2B'};
+
+function getCorrPairs(){
+  const pairs=[];
+  CHAIN_CELLS.forEach(cc=>{
+    const under=cc.label.indexOf('_');
+    const tsl=cc.label.slice(0,under);       // e.g. "7TSL"
+    const ct =cc.label.slice(under+1);        // e.g. "NAND2T"
+    const mapped=CHAIN_TO_SINGLE[ct];
+    if(!mapped) return;
+    const singleKey=tsl+'_'+mapped;
+    if(!D[singleKey]) return;
+    pairs.push({chainLabel:cc.label, singleKey, shortName:cc.label,
+                chainCell:cc, singleCell:D[singleKey], tsl});
+  });
+  return pairs;
+}
+
+function buildCorrView(){
+  const vi=getCompVddIdx();
+  const vddLabel=VDD[vi]+'V';
+  const sm=SINGLE_META, cm=CHAIN_META;
+  const pairs=getCorrPairs();
+  // Use CHAIN_CELLS directly — per-stage values as reported by HSPICE
+  const chainMap=Object.fromEntries(CHAIN_CELLS.map(c=>[c.label,c]));
+
+  // subtitle
+  document.getElementById('corr-subtitle').textContent=
+    `Single Stage: ${sm.simulator} \u00b7 ${sm.technology} ${sm.vt_flavor} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp} \u00b7 VDD\u202f=\u202f${vddLabel}`+
+    `   \u2016   Chain Per-Stage: ${cm.simulator} \u00b7 ${cm.technology} \u00b7 ${cm.vt_flavor} \u00b7 ${cm.corner} \u00b7 T\u202f=\u202f${cm.temp} \u00b7 VDD\u202f=\u202f${cm.vdd}`;
+
+  // bar/scatter chart subtitles
+  const barSub=`VDD\u202f=\u202f${vddLabel} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp} \u00b7 Cyan\u202f=\u202fSingle Stage \u00b7 Orange\u202f=\u202fChain Per-Stage \u00b7 Both: ${sm.technology}`;
+  const scSub =`X\u202f=\u202fSingle Stage \u00b7 Y\u202f=\u202fChain Per-Stage \u00b7 Both: ${sm.technology} \u00b7 VDD\u202f=\u202f${vddLabel} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp}`;
+  const iddqBarSub=`\u26a0 Not directly comparable \u2014 Single\u202f=\u202fDC leakage (FIND AT=0ps) \u00b7 Chain\u202f=\u202fper-stage dynamic current in oscillating ring \u00b7 VDD\u202f=\u202f${vddLabel}`;
+  const iddqScSub =`\u26a0 Different quantities: X\u202f=\u202fsingle-cell DC leakage (nA) \u00b7 Y\u202f=\u202fchain per-stage dynamic current (nA) \u00b7 shown for reference only`;
+  ['delay','ceff','acreff'].forEach(k=>document.getElementById('corr-bar-'+k+'-sub').textContent=barSub);
+  document.getElementById('corr-bar-iddq-sub').textContent=iddqBarSub;
+  ['delay','ceff'].forEach(k=>document.getElementById('corr-sc-'+k+'-sub').textContent=scSub);
+  document.getElementById('corr-sc-iddq-sub').textContent=iddqScSub;
+  document.getElementById('corr-sc-pct-sub').textContent=
+    `Stage Delay & Ceff only \u2014 IDDQ excluded (not comparable) \u00b7 Both: ${sm.technology} \u00b7 VDD\u202f=\u202f${vddLabel} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp}`;
+
+  // ── Delta table ──
+  const dPct=(a,b)=>{
+    const d=(b-a)/a*100;
+    const col=Math.abs(d)<2?'#ffe93e':d>0?'#ff2d78':'#00ff9f';
+    return `<span style="color:${col}">${d>0?'+':''}${d.toFixed(1)}%</span>`;
+  };
+  document.getElementById('corr-tbody').innerHTML=pairs.map(p=>{
+    const s=p.singleCell;
+    const cn=chainMap[p.chainLabel];
+    const sd_s=s.stage_delay[vi];
+    const sd_c=cn.stage_delay;
+    const iq_s=s.iddq[vi]*1e9;
+    const iq_c=cn.iddq;
+    const cf_s=s.acceff[vi]*1e15;
+    const cf_c=cn.ceff;
+    const ar_s=s.acreff[vi];
+    const ar_c=cn.acreff;
+    return `<tr>
+      <td><span class="chip chip7">${p.chainLabel}</span></td>
+      <td style="color:var(--muted);font-size:11px">${p.singleKey}</td>
+      <td class="mono" style="text-align:right;border-left:2px solid var(--border)">${sd_s.toFixed(4)}</td>
+      <td class="mono" style="text-align:right">${sd_c.toFixed(5)}</td>
+      <td style="text-align:right">${dPct(sd_s,sd_c)}</td>
+      <td class="mono" style="text-align:right;border-left:2px solid var(--border);color:#ff2d78;opacity:0.7">${iq_s.toFixed(4)}</td>
+      <td class="mono" style="text-align:right;color:#ff2d78;opacity:0.7">${iq_c.toFixed(5)}</td>
+      <td class="mono" style="text-align:right;border-left:2px solid var(--border)">${cf_s.toFixed(4)}</td>
+      <td class="mono" style="text-align:right">${cf_c.toFixed(5)}</td>
+      <td style="text-align:right">${dPct(cf_s,cf_c)}</td>
+      <td class="mono" style="text-align:right;border-left:2px solid var(--border)">${ar_s.toFixed(2)}</td>
+      <td class="mono" style="text-align:right">${ar_c.toFixed(5)}</td>
+    </tr>`;
+  }).join('');
+
+  if(corrChartsBuilt) return;
+  corrChartsBuilt=true;
+
+  const labels=pairs.map(p=>p.chainLabel);
+  const C_S='#00d4ff', C_C='#ff6b35';
+
+  // shared grouped-bar options
+  const grpOpts=(yLabel)=>({
+    responsive:true,animation:false,
+    plugins:{
+      legend:{labels:{color:'#7a85a0',font:{size:11},boxWidth:12}},
+      tooltip:{mode:'index',intersect:false,
+        callbacks:{title:i=>`Cell: ${i[0].label} \u00b7 VDD\u202f=\u202f${vddLabel}`}}
+    },
+    scales:{
+      x:{ticks:{color:'#7a85a0',font:{size:10},maxRotation:50},grid:{color:'#1c2030'},
+         title:{display:true,text:'Cell',color:'#7a85a0',font:{size:10}}},
+      y:{ticks:{color:'#7a85a0',font:{size:10}},grid:{color:'#1c2030'},
+         title:{display:true,text:yLabel,color:'#7a85a0',font:{size:10}}}
+    }
+  });
+
+  // shared scatter options — adds a 1:1 reference line dataset
+  const scOpts=(xLabel,yLabel)=>({
+    responsive:true,animation:false,
+    plugins:{
+      legend:{labels:{color:'#7a85a0',font:{size:11},boxWidth:12}},
+      tooltip:{callbacks:{
+        title:()=>`VDD\u202f=\u202f${vddLabel} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp}`,
+        label:i=>i.dataset.label==='1:1 ref'?null:
+          `${i.raw.label}: X=${i.raw.x.toFixed(4)}, Y=${i.raw.y.toFixed(5)}`
+      }}
+    },
+    scales:{
+      x:{ticks:{color:'#7a85a0',font:{size:10}},grid:{color:'#1c2030'},
+         title:{display:true,text:xLabel+` \u2014 Single Stage ${sm.technology} @ ${vddLabel}`,color:'#7a85a0',font:{size:10}}},
+       y:{ticks:{color:'#7a85a0',font:{size:10}},grid:{color:'#1c2030'},
+          title:{display:true,text:yLabel+` \u2014 Chain Per-Stage ${cm.technology} @ ${cm.vdd}`,color:'#7a85a0',font:{size:10}}}
+    }
+  });
+
+  // helper: build 1:1 reference line from min→max of combined x+y values
+  function refLine(pts){
+    const allV=pts.flatMap(p=>[p.x,p.y]);
+    const mn=Math.min(...allV), mx=Math.max(...allV);
+    return [{x:mn,y:mn},{x:mx,y:mx}];
+  }
+
+  // ── BAR: Stage Delay ──
+  new Chart(document.getElementById('corr-bar-delay'),{type:'bar',data:{labels,datasets:[
+    {label:`Single Stage ${sm.technology} \u2014 Stage Delay (ps) @ ${vddLabel}`,
+     data:pairs.map(p=>p.singleCell.stage_delay[vi]),
+     backgroundColor:C_S+'99',borderColor:C_S,borderWidth:2,borderRadius:4},
+    {label:`Chain Per-Stage ${cm.technology} \u2014 Stage Delay (ps) @ ${cm.vdd}`,
+     data:pairs.map(p=>chainMap[p.chainLabel].stage_delay),
+     backgroundColor:C_C+'99',borderColor:C_C,borderWidth:2,borderRadius:4}
+  ]},options:grpOpts('Stage Delay (ps)')});
+
+  // ── BAR: IDDQ — shown with warning; different circuit types ──
+  const iddqGrpOpts=grpOpts('IDDQ (nA) \u2014 \u26a0 different circuits');
+  iddqGrpOpts.plugins.tooltip.callbacks.afterBody=()=>['\u26a0 Single = DC leakage AT=0ps','\u26a0 Chain = per-stage dynamic current'];
+  new Chart(document.getElementById('corr-bar-iddq'),{type:'bar',data:{labels,datasets:[
+    {label:`Single Stage DC leakage (nA) @ ${vddLabel} \u2014 FIND AT=0ps`,
+     data:pairs.map(p=>p.singleCell.iddq[vi]*1e9),
+     backgroundColor:C_S+'55',borderColor:C_S+'88',borderWidth:2,borderRadius:4,borderDash:[4,4]},
+    {label:`Chain per-stage dynamic current (nA) @ ${cm.vdd}`,
+     data:pairs.map(p=>chainMap[p.chainLabel].iddq),
+     backgroundColor:C_C+'55',borderColor:C_C+'88',borderWidth:2,borderRadius:4,borderDash:[4,4]}
+  ]},options:iddqGrpOpts});
+
+  // ── BAR: Ceff / ACCeff ──
+  new Chart(document.getElementById('corr-bar-ceff'),{type:'bar',data:{labels,datasets:[
+    {label:`Single Stage ${sm.technology} \u2014 ACCeff (fF) @ ${vddLabel}`,
+     data:pairs.map(p=>p.singleCell.acceff[vi]*1e15),
+     backgroundColor:C_S+'99',borderColor:C_S,borderWidth:2,borderRadius:4},
+    {label:`Chain Per-Stage ${cm.technology} \u2014 Ceff (fF) @ ${cm.vdd}`,
+     data:pairs.map(p=>chainMap[p.chainLabel].ceff),
+     backgroundColor:C_C+'99',borderColor:C_C,borderWidth:2,borderRadius:4}
+  ]},options:grpOpts('Capacitance (fF)')});
+
+  // ── BAR: ACReff — dual Y axis (different units) ──
+  new Chart(document.getElementById('corr-bar-acreff'),{type:'bar',data:{labels,datasets:[
+    {label:`Single Stage ${sm.technology} \u2014 ACReff (\u03a9) @ ${vddLabel}`,
+     data:pairs.map(p=>p.singleCell.acreff[vi]),
+     backgroundColor:C_S+'99',borderColor:C_S,borderWidth:2,borderRadius:4,yAxisID:'yL'},
+    {label:`Chain Per-Stage ${cm.technology} \u2014 ACReff (K\u03a9) @ ${cm.vdd}`,
+     data:pairs.map(p=>chainMap[p.chainLabel].acreff),
+     backgroundColor:C_C+'99',borderColor:C_C,borderWidth:2,borderRadius:4,yAxisID:'yR'}
+  ]},options:{responsive:true,animation:false,
+    plugins:{
+      legend:{labels:{color:'#7a85a0',font:{size:11},boxWidth:12}},
+      tooltip:{mode:'index',intersect:false,
+        callbacks:{title:i=>`Cell: ${i[0].label} \u00b7 VDD\u202f=\u202f${vddLabel}`}}
+    },
+    scales:{
+      x:{ticks:{color:'#7a85a0',font:{size:10},maxRotation:50},grid:{color:'#1c2030'},
+         title:{display:true,text:'Cell',color:'#7a85a0',font:{size:10}}},
+      yL:{position:'left',ticks:{color:C_S,font:{size:10}},grid:{color:'#1c2030'},
+          title:{display:true,text:`Single Stage ACReff (\u03a9) \u00b7 ${sm.technology} @ ${vddLabel}`,color:C_S,font:{size:10}}},
+      yR:{position:'right',ticks:{color:C_C,font:{size:10}},grid:{drawOnChartArea:false},
+          title:{display:true,text:`Chain Per-Stage ACReff (K\u03a9) \u00b7 ${cm.technology} @ ${cm.vdd}`,color:C_C,font:{size:10}}}
+    }}});
+
+  // ── SCATTER: Stage Delay ──
+  const sdPts=pairs.map(p=>({
+    x:p.singleCell.stage_delay[vi], y:chainMap[p.chainLabel].stage_delay, label:p.chainLabel
+  }));
+  const sdOpts=scOpts('Stage Delay (ps)','Stage Delay (ps)');
+  sdOpts.plugins.tooltip.callbacks.label=i=>i.dataset.label==='1:1 ref'?null:
+    `${i.raw.label}: single=${i.raw.x.toFixed(4)} ps, chain per-stage=${i.raw.y.toFixed(4)} ps`;
+  new Chart(document.getElementById('corr-sc-delay'),{type:'scatter',data:{datasets:[
+    {label:`Cells \u00b7 VDD=${vddLabel}`,data:sdPts,
+     backgroundColor:pairs.map((_,i)=>CHAIN_COLORS[i]+'cc'),
+     borderColor:pairs.map((_,i)=>CHAIN_COLORS[i]),pointRadius:9,pointHoverRadius:11},
+    {label:'1:1 ref',data:refLine(sdPts),type:'line',borderColor:'#ffffff33',borderWidth:1,
+     borderDash:[5,5],pointRadius:0,fill:false,order:0}
+  ]},options:sdOpts});
+
+  // ── SCATTER: IDDQ ──
+  const iqPts=pairs.map(p=>({
+    x:p.singleCell.iddq[vi]*1e9, y:chainMap[p.chainLabel].iddq, label:p.chainLabel
+  }));
+  const iqOpts=scOpts('IDDQ (nA)','IDDQ (nA)');
+  iqOpts.plugins.tooltip.callbacks.label=i=>i.dataset.label==='1:1 ref'?null:
+    `${i.raw.label}: single DC leakage=${i.raw.x.toFixed(4)} nA, chain dynamic/stage=${i.raw.y.toFixed(4)} nA`;
+  new Chart(document.getElementById('corr-sc-iddq'),{type:'scatter',data:{datasets:[
+    {label:`Cells \u00b7 VDD=${vddLabel}`,data:iqPts,
+     backgroundColor:pairs.map((_,i)=>CHAIN_COLORS[i]+'cc'),
+     borderColor:pairs.map((_,i)=>CHAIN_COLORS[i]),pointRadius:9,pointHoverRadius:11},
+    {label:'1:1 ref',data:refLine(iqPts),type:'line',borderColor:'#ffffff33',borderWidth:1,
+     borderDash:[5,5],pointRadius:0,fill:false,order:0}
+  ]},options:iqOpts});
+
+  // ── SCATTER: Ceff / ACCeff ──
+  const cfPts=pairs.map(p=>({
+    x:p.singleCell.acceff[vi]*1e15, y:chainMap[p.chainLabel].ceff, label:p.chainLabel
+  }));
+  const cfOpts=scOpts('ACCeff (fF)','Norm. Ceff (fF)');
+  cfOpts.plugins.tooltip.callbacks.label=i=>i.dataset.label==='1:1 ref'?null:
+    `${i.raw.label}: single ACCeff=${i.raw.x.toFixed(4)} fF, chain Ceff=${i.raw.y.toFixed(4)} fF`;
+  new Chart(document.getElementById('corr-sc-ceff'),{type:'scatter',data:{datasets:[
+    {label:`Cells \u00b7 VDD=${vddLabel}`,data:cfPts,
+     backgroundColor:pairs.map((_,i)=>CHAIN_COLORS[i]+'cc'),
+     borderColor:pairs.map((_,i)=>CHAIN_COLORS[i]),pointRadius:9,pointHoverRadius:11},
+    {label:'1:1 ref',data:refLine(cfPts),type:'line',borderColor:'#ffffff33',borderWidth:1,
+     borderDash:[5,5],pointRadius:0,fill:false,order:0}
+  ]},options:cfOpts});
+
+  // ── % Difference bar — Stage Delay & Ceff only; IDDQ excluded (not comparable) ──
+  const pctMetrics=[
+    {label:`Stage Delay % diff \u00b7 Chain Per-Stage vs Single Stage 00b7 VDD=${vddLabel}`, col:'#00d4ff',
+     fn:p=>((chainMap[p.chainLabel].stage_delay - p.singleCell.stage_delay[vi])/p.singleCell.stage_delay[vi]*100)},
+    {label:`Ceff % diff \u00b7 Chain Per-Stage vs Single Stage 00b7 VDD=${vddLabel}`, col:'#00ff9f',
+     fn:p=>((chainMap[p.chainLabel].ceff - p.singleCell.acceff[vi]*1e15)/(p.singleCell.acceff[vi]*1e15)*100)}
+  ];
+  new Chart(document.getElementById('corr-sc-pct'),{type:'bar',data:{labels,datasets:
+    pctMetrics.map(mk=>({
+      label:mk.label,
+      data:pairs.map(mk.fn),
+      backgroundColor:mk.col+'99',borderColor:mk.col,borderWidth:2,borderRadius:4
+    }))
+  },options:{responsive:true,animation:false,
+    plugins:{
+      legend:{labels:{color:'#7a85a0',font:{size:11},boxWidth:12}},
+      tooltip:{mode:'index',intersect:false,
+        callbacks:{
+          title:i=>`Cell: ${i[0].label} \u00b7 VDD\u202f=\u202f${vddLabel} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp}`,
+          label:i=>`${i.dataset.label}: ${i.raw>0?'+':''}${i.raw.toFixed(2)}% (Chain Per-Stage vs Single Stage \u2014 topology difference)`
+        }}
+    },
+    scales:{
+      x:{ticks:{color:'#7a85a0',font:{size:10},maxRotation:50},grid:{color:'#1c2030'},
+         title:{display:true,text:'Cell',color:'#7a85a0',font:{size:10}}},
+      y:{ticks:{color:'#7a85a0',font:{size:10},callback:v=>v.toFixed(1)+'%'},
+         grid:{color:'#1c2030'},
+         title:{display:true,
+           text:`% diff: (Chain Per-Stage \u2212 Single Stage) / Single Stage \u00d7 100 \u00b7 Both: ${sm.technology} \u00b7 VDD=${vddLabel}`,
+           color:'#7a85a0',font:{size:10}}}
+    }}});
+}
+
+function switchDataset(val){
+  // Hide all views
+  ['view-single','view-chain-raw','view-chain','view-corr']
+    .forEach(id=>document.getElementById(id).style.display='none');
+
+  const m=CHAIN_META, sm=SINGLE_META;
+
+  if(val==='chain_raw'){
+    document.getElementById('view-chain-raw').style.display='';
+    document.getElementById('header-subtitle').textContent=
+      `${m.simulator} \u00b7 ${m.technology} \u00b7 ${m.corner} Corner \u00b7 T\u202f=\u202f${m.temp} \u00b7 Raw ring oscillator totals (\u00d7${m.stages})`;
+    document.getElementById('header-badges').innerHTML=`
+      <span class="badge">${CHAIN_CELLS.length} cells</span>
+      <span class="badge">${m.vt_flavor}</span>
+      <span class="badge">${m.stages}-stage chain</span>
+      <span class="badge">VDD\u202f=\u202f${m.vdd}</span>
+      <span class="badge">T\u202f=\u202f${m.temp} \u00b7 ${m.corner}</span>
+      <span class="badge">${m.technology}</span>
+      <span class="badge" style="border-color:#ffe93e;color:#ffe93e">scalable metrics \u00d7${m.stages}</span>`;
+    buildChainRawView();
+
+  } else if(val==='chain'){
+    document.getElementById('view-chain').style.display='';
+    document.getElementById('header-subtitle').textContent=
+      `${m.simulator} \u00b7 ${m.technology} \u00b7 ${m.corner} Corner \u00b7 T\u202f=\u202f${m.temp} \u00b7 Per-stage (as reported by HSPICE)`;
+    document.getElementById('header-badges').innerHTML=`
+      <span class="badge">${CHAIN_CELLS.length} cells</span>
+      <span class="badge">${m.vt_flavor}</span>
+      <span class="badge">${m.stages}-stage chain</span>
+      <span class="badge">VDD\u202f=\u202f${m.vdd}</span>
+      <span class="badge">T\u202f=\u202f${m.temp} \u00b7 ${m.corner}</span>
+      <span class="badge">${m.technology}</span>
+      <span class="badge" style="border-color:var(--accent2);color:var(--accent2)">per-stage (HSPICE \u00f7STAGES)</span>`;
+    buildChainView();
+
+  } else if(val==='corr'){
+    document.getElementById('view-corr').style.display='';
+    document.getElementById('header-subtitle').textContent=
+      `${sm.technology} ${sm.vt_flavor} Single Stage vs Chain Per-Stage \u00b7 VDD\u202f=\u202f${m.vdd} \u00b7 ${sm.corner} \u00b7 T\u202f=\u202f${sm.temp}`;
+    document.getElementById('header-badges').innerHTML=`
+      <span class="badge" style="border-color:#00d4ff;color:#00d4ff">Single Stage \u00b7 ${sm.technology}</span>
+      <span class="badge" style="border-color:#ff6b35;color:#ff6b35">Chain Per-Stage \u00b7 ${m.technology}</span>
+      <span class="badge">VDD\u202f=\u202f${m.vdd}</span>
+      <span class="badge">${sm.corner} \u00b7 T\u202f=\u202f${sm.temp}</span>
+      <span class="badge">${getCorrPairs().length} matched cells \u00b7 4 metrics</span>`;
+    buildCorrView();
+
+  } else {
+    // default: single
+    document.getElementById('view-single').style.display='';
+    document.getElementById('header-subtitle').textContent=singleCondStr();
+    document.getElementById('header-badges').innerHTML=`
+      <span class="badge">${sm.n_sims} simulations</span>
+      <span class="badge">${sm.n_cells} cells</span>
+      <span class="badge">${sm.tsl_flavors}</span>
+      <span class="badge">VDD ${sm.vdd_range} (${sm.vdd_pts} pts)</span>
+      <span class="badge">${sm.n_metrics} metrics per cell</span>`;
+  }
+}
+
+// Boot — initialise metadata-driven labels before first render
+Chart.defaults.color='#7a85a0';
+(function initLabels(){
+  const m=SINGLE_META;
+  document.getElementById('header-subtitle').textContent=singleCondStr();
+  document.getElementById('header-badges').innerHTML=`
+    <span class="badge">${m.n_sims} simulations</span>
+    <span class="badge">${m.n_cells} cells</span>
+    <span class="badge">${m.tsl_flavors}</span>
+    <span class="badge">VDD ${m.vdd_range} (${m.vdd_pts} pts)</span>
+    <span class="badge">${m.n_metrics} metrics per cell</span>`;
+  document.getElementById('page-title').textContent=
+    `PPG Delay Chain \u2014 ${m.technology} ${m.vt_flavor} Results`;
+})();
+buildVddPills();
+renderAll();
+</script>
+</body>
+</html>
