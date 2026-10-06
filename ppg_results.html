@@ -328,14 +328,14 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
   <!-- Legend + context notes -->
   <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:20px;font-size:12px;line-height:1.8">
     <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:10px;">
-      <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#00d4ff;margin-right:6px;vertical-align:middle"></span><strong style="color:#00d4ff">Single Stage</strong> — v0.6SB2 (Spice-260604-sandbox) · ULVT · single-cell SPICE · VDD sweep</span>
-      <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#ff6b35;margin-right:6px;vertical-align:middle"></span><strong style="color:#ff6b35">Chain Per-Stage</strong> — v0.6SB2 (Spice-260604-sandbox) · ULVT · 101-stage chain · per-stage values as reported by HSPICE</span>
+      <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#00d4ff;margin-right:6px;vertical-align:middle"></span><strong style="color:#00d4ff">Single Stage</strong> — v0.6SB2 (Spice-260604-sandbox) · <strong style="color:#ffe93e">ULVT</strong> · single-cell SPICE · VDD sweep</span>
+      <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#ff6b35;margin-right:6px;vertical-align:middle"></span><strong style="color:#ff6b35">Chain Per-Stage</strong> — v0.6SB2 (Spice-260604-sandbox) · <strong style="color:#ffe93e">SLVT</strong> · 101-stage chain · per-stage values as reported by HSPICE</span>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:8px;color:var(--muted)">
-      <div><span style="color:#ffe93e">⚠ Stage Delay:</span> Both datasets use the same model (v0.6SB2 · Spice-260604-sandbox). Any delta is due to circuit topology: isolated single cell vs. embedded stage in a 101-stage oscillating ring with real fanout loading.</div>
-      <div><span style="color:#ff2d78">⚠ IDDQ — NOT directly comparable:</span> Single-INV IDDQ = DC leakage of 1 cell (FIND I AT=0 ps). Chain per-stage IDDQ = dynamic current per stage in an oscillating ring — fundamentally different quantities.</div>
-      <div><span style="color:#00ff9f">✓ Ceff / ACCeff:</span> Comparable — both derived from charge-based extraction. Small delta reflects circuit topology (ring vs. isolated cell), not a model difference.</div>
-      <div><span style="color:#00ff9f">✓ ACReff:</span> Units differ (single=Ω, chain=KΩ) — shown on separate axes. Ratio reflects circuit topology difference.</div>
+      <div><span style="color:#ffe93e">⚠ Stage Delay (~20–30% delta):</span> Both datasets use v0.6SB2 (Spice-260604-sandbox) but <strong style="color:#ff2d78">different Vt flavors — single-stage is ULVT, chain is SLVT</strong>. SLVT has higher Vt and lower leakage than ULVT → slower delay. This Vt difference is the primary cause of the observed delta.</div>
+      <div><span style="color:#ff2d78">⚠ IDDQ — NOT directly comparable:</span> Single-INV IDDQ = DC leakage of 1 cell (FIND I AT=0 ps). Chain per-stage IDDQ = dynamic current per stage in an oscillating ring — fundamentally different quantities. Additionally, ULVT vs SLVT leakage differ significantly.</div>
+      <div><span style="color:#00ff9f">✓ Ceff / ACCeff:</span> Comparable — both derived from charge-based extraction. Delta reflects ULVT vs SLVT device sizing and Vt flavor difference.</div>
+      <div><span style="color:#00ff9f">✓ ACReff:</span> Units differ (single=Ω, chain=KΩ) — shown on separate axes. Ratio reflects ULVT vs SLVT Vt flavor and circuit topology difference.</div>
     </div>
   </div>
 
@@ -370,7 +370,7 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
 
   <!-- Grouped bar charts -->
   <div class="section-title" style="margin-bottom:4px"><span class="bar"></span>Grouped Bar Charts — Single Stage vs Chain Per-Stage @ 0.70V</div>
-  <p style="font-size:11px;color:var(--muted);margin-bottom:14px;">Cyan = Single Stage · Orange = Chain Per-Stage · Both use v0.6SB2 (Spice-260604-sandbox) · Any delta is due to circuit topology, not model version</p>
+  <p style="font-size:11px;color:var(--muted);margin-bottom:14px;">Cyan = Single Stage (ULVT) · Orange = Chain Per-Stage (SLVT) · Same model v0.6SB2 (Spice-260604-sandbox) · Delta primarily due to ULVT vs SLVT Vt flavor difference</p>
   <div class="charts-grid" style="margin-bottom:32px">
     <div class="chart-card">
       <div class="chart-title">Stage Delay (ps)</div>
@@ -396,7 +396,7 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:14px;text-
 
   <!-- Scatter plots -->
   <div class="section-title" style="margin-bottom:4px"><span class="bar"></span>Scatter Plots — Single Stage (X) vs Chain Per-Stage (Y) @ 0.70V</div>
-  <p style="font-size:11px;color:var(--muted);margin-bottom:16px;">Each point = one cell · Dashed line = 1:1 · Points above = chain larger · Deviation from diagonal = circuit topology difference (ring oscillator vs. isolated cell) · Both use v0.6SB2 (Spice-260604-sandbox)</p>
+  <p style="font-size:11px;color:var(--muted);margin-bottom:16px;">Each point = one cell · Dashed line = 1:1 · Points above = chain larger · Deviation from diagonal primarily due to ULVT (single) vs SLVT (chain) Vt flavor difference · Same model v0.6SB2 (Spice-260604-sandbox)</p>
   <div class="charts-grid">
     <div class="chart-card">
       <div class="chart-title">Stage Delay (ps)</div>
