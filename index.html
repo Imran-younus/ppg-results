@@ -377,10 +377,10 @@ footer{border-top:1px solid var(--border);margin-top:40px;padding-top:12px;text-
       <span><span class="legend-dot" style="background:#ff6b35"></span><strong style="color:#ff6b35">Chain Per-Stage</strong> — 101-stage ring oscillator · per-stage values · SLVT</span>
     </div>
     <div class="legend-notes">
-      <div><span style="color:var(--yellow)">⚠ Stage Delay (~9% delta):</span> Both datasets are SLVT, same model. Delta is <strong>topology-driven</strong> — the ring has additional wire parasitics and load coupling absent in the isolated cell.</div>
+      <div><span style="color:var(--yellow)">⚠ Stage Delay (~44% higher in chain):</span> Both datasets are SLVT, same model. Delta is <strong>topology-driven</strong> — the 101-stage ring accumulates wire parasitics and load coupling absent in the isolated single-stage cell.</div>
       <div><span style="color:var(--pink)">⚠ IDDQ — not comparable:</span> Single-stage = DC static leakage (FIND AT=0 ps). Chain = dynamic switching current per stage. Fundamentally different measurement quantities.</div>
-      <div><span style="color:var(--green)">✓ Ceff / ACCeff (~5% delta):</span> Comparable — charge-based extraction. Small delta from additional ring parasitic capacitance.</div>
-      <div><span style="color:var(--green)">✓ ACReff (~3% delta):</span> Most robust metric. Intrinsic V/I ratio — least sensitive to ring topology. Units unified to KΩ for direct comparison.</div>
+      <div><span style="color:var(--yellow)">⚠ Ceff / ACCeff (~8% lower in chain):</span> Chain per-stage Ceff is slightly lower than single-stage ACCeff — the ring cell drives a weaker net load than the explicit FO3 test load in the isolated cell.</div>
+      <div><span style="color:var(--yellow)">⚠ ACReff (~56% higher in chain):</span> Largest delta metric — ring extra wire resistance dominates. The intrinsic device V/I ratio is inflated by interconnect RC. Units unified to KΩ for direct comparison.</div>
     </div>
   </div>
 
@@ -1618,9 +1618,9 @@ function renderTopoPage(){
   const avg=a=>(a.reduce((s,v)=>s+v,0)/a.length).toFixed(1);
   const rng=a=>`${Math.min(...a).toFixed(1)}–${Math.max(...a).toFixed(1)}`;
   document.getElementById('topo-takeaway-list').innerHTML=`
-    <li><strong>Stage delay delta of ~${avg(sdDeltas)}% is systematic across all ${pairs.length} matched cell types</strong> (range: ${rng(sdDeltas)}%). The tight range confirms this is a topology effect — not cell-specific. The ring has additional wire parasitics absent in the isolated cell.</li>
-    <li><strong>Ceff delta (~${avg(cfDeltas)}%) is smaller than delay delta (~${avg(sdDeltas)}%)</strong>: the additional ring delay is not fully explained by capacitance alone — interconnect RC resistance contributes.</li>
-    <li><strong>ACReff delta (~${avg(arDeltas)}%) is the smallest and most consistent metric</strong> (range: ${rng(arDeltas)}%). ACReff is the least sensitive to ring topology — the intrinsic V/I ratio of the switching transition is largely topology-independent. Units unified to KΩ for direct comparison.</li>
+    <li><strong>Stage delay delta of ~${avg(sdDeltas)}% is systematic across all ${pairs.length} matched cell types</strong> (range: ${rng(sdDeltas)}%). The tight range confirms this is a topology effect — not cell-specific. The 101-stage ring accumulates wire parasitics and load coupling absent in the isolated cell.</li>
+    <li><strong>Ceff / ACCeff delta (~${avg(cfDeltas)}%)</strong>: Chain per-stage Ceff is slightly lower than single-stage ACCeff — the ring cell drives a weaker net load than the explicit FO3 test load. The ring's additional delay is not explained by capacitance; it is dominated by interconnect RC resistance.</li>
+    <li><strong>ACReff delta (~${avg(arDeltas)}%) is the largest metric delta</strong> (range: ${rng(arDeltas)}%). The ring's extra wire resistance inflates the intrinsic V/I ratio significantly beyond the isolated-cell value. Units unified to KΩ for direct comparison.</li>
     <li><strong>IDDQ values are not compared</strong>: single-stage IDDQ is a DC static leakage (measured at t=0 ps) while chain per-stage IDDQ is a dynamic switching current in an oscillating ring — fundamentally different physical quantities.</li>`;
 }
 
