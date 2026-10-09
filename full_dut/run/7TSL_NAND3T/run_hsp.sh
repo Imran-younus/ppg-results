@@ -1,0 +1,4 @@
+#!/bin/ksh
+export PATH=/afs/apd.pok.ibm.com/ant/cad_tools/synopsys/Hspice/T-2022.06-SP2/hspice/hspice/T-2022.06-SP2/hspice/bin:/bin:/usr/bin:/usr/share/Modules/bin:/usr/local:/usr/local/sbin:/usr/sbin:/usr/afsws/bin:/usr/bin/X11:/lib:/afs/apd/u/imranyou/bin:/gpfs/projects/t/tools/Scripts/Utilities:.:/gpfs/projects/g/gpfstools/tools:/usr/ssttools/bin:/gsa/pokgsa/projects/s/srdctestsites/bin:/afs/apd/func/data/d6lv/bin:/gsa/pokgsa/projects/p/pde/cte_tech/common/bin:/usr/gsa/bin:/home/lsf/releasedir/etc:/home/lsf/releasedir/bin:/home/lsf/tools/usertools
+export LM_LICENSE_FILE=27020@riclic.pok.ibm.com:27020@poklnxlic04.pok.ibm.com:27020@cdsserv1.pok.ibm.com:27020@cdsserv2.pok.ibm.com:27020@cdsserv3.pok.ibm.com
+/afs/apd.pok.ibm.com/u/imranyou/for_imran/hsp_2022_new /afs/apd.pok.ibm.com/u/imranyou/for_imran/full_dut/run/7TSL_NAND3T/invfo3_mod.sp

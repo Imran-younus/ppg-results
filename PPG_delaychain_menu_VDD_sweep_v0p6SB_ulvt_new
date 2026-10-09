@@ -1,0 +1,160 @@
+#!/bin/ksh
+#=============================================================================
+# PPG_delaychain_menu_VDD_sweep_v0p6SB_ulvt_new
+# Purpose : Run HSPICE single-stage delay-chain simulations for 24 cell types
+#           across 14 voltage points (0.50 V – 1.15 V) in a parallel LSF burst.
+#           All 336 jobs (14 voltages × 24 cells) are submitted at once.
+#           Results are collected into PPGRO_chain_menu14.txt.
+#
+# REQUIRED PARAMETERS (env vars, set before running):
+#   MODEL_INC  — full path to design_include.inc for the desired model
+#   MODEL_LIB  — full path to fixed_corner.lib for the desired model
+#   MODEL_NAME — short label, e.g. "v0.6SB"  "v0.22"  "v1.0"
+#
+# OPTIONAL PARAMETERS:
+#   SPFDIR     — override the default SPF source directory
+#   VOLTAGES   — space-separated list of VDD values (default: 0.5 … 1.15)
+#
+# Example:
+#   MODEL_INC='/afs/.../Spice-XXXXXX/design_include.inc' \
+#   MODEL_LIB='/afs/.../Spice-XXXXXX/fixed_corner.lib' \
+#   MODEL_NAME='vX.Y' \
+#   ksh PPG_delaychain_menu_VDD_sweep_v0p6SB_ulvt_new
+#=============================================================================
+
+SCRIPTDIR='/afs/apd.pok.ibm.com/u/imranyou/for_imran'
+
+# Load shared library
+. "$SCRIPTDIR/ppg_sim_lib.sh"
+
+#-----------------------------------------------------------------------------
+# Configuration
+#-----------------------------------------------------------------------------
+SPFDIR="${SPFDIR:-/gpfs/projects/t/titan/dtco/usr/sbajaj/SPF_files/tpdk0.6sb}"
+BASESP="$SCRIPTDIR/invfo3_base.sp"
+SPF_OUT='PPGchain.spf'
+NETLIST='invfo3_mod.sp'
+RESULTS14="$SCRIPTDIR/PPGRO_chain_menu14.txt"
+LSF_SELECT='(osver==rh8) && (type == X86_64) && ! etx && ! nojobs'
+LSF_JOBPREFIX='PPGvdd'
+HSPICE_BIN='/afs/apd.pok.ibm.com/ant/cad_tools/synopsys/Hspice/T-2022.06-SP2/hspice/hspice/T-2022.06-SP2/hspice/bin'
+VOLTAGES="${VOLTAGES:-0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1.0 1.05 1.1 1.15}"
+
+# Validate model parameters (exits if any are missing or files not found)
+validate_model_params
+
+mkdir -p "$SCRIPTDIR/run_vdd"
+
+#-----------------------------------------------------------------------------
+# Cell table: "label  spf_file  subckt_name"
+#-----------------------------------------------------------------------------
+CELL_ENTRIES="
+6TSL_INV    $SPFDIR/PPG1_INV_X2_6TSL.spf          PPG1_INV_X2_6TSL
+6TSL_NAND2B $SPFDIR/PPG1_NAND2_X1_B_6TSL.spf      PPG1_NAND2_X1_B_6TSL
+6TSL_NOR2B  $SPFDIR/PPG1_NOR2_X1_B_6TSL.spf       PPG1_NOR2_X1_B_6TSL
+6TSL_NAND3B $SPFDIR/PPG1_NAND3_X1_B_6TSL.spf      PPG1_NAND3_X1_B_6TSL
+6TSL_AOI21  $SPFDIR/PPG1_AOI21_X1_1S0_6TSL.spf    PPG1_AOI21_X1_1S0_6TSL
+6TSL_AOI22  $SPFDIR/PPG1_AOI22_X1_S110_6TSL.spf   PPG1_AOI22_X1_S110_6TSL
+6TSL_OAI21  $SPFDIR/PPG1_OAI21_X1_0S1_6TSL.spf    PPG1_OAI21_X1_0S1_6TSL
+6TSL_OAI22  $SPFDIR/PPG1_OAI22_X1_0S11_6TSL.spf   PPG1_OAI22_X1_0S11_6TSL
+7TSL_INV    $SPFDIR/PPG1_INV_X2_7TSL.spf          PPG1_INV_X2_7TSL
+7TSL_NAND2B $SPFDIR/PPG1_NAND2_X1_B_7TSL.spf      PPG1_NAND2_X1_B_7TSL
+7TSL_NOR2B  $SPFDIR/PPG1_NOR2_X1_B_7TSL.spf       PPG1_NOR2_X1_B_7TSL
+7TSL_NAND3B $SPFDIR/PPG1_NAND3_X1_B_7TSL.spf      PPG1_NAND3_X1_B_7TSL
+7TSL_AOI21  $SPFDIR/PPG1_AOI21_X1_1S0_7TSL.spf    PPG1_AOI21_X1_1S0_7TSL
+7TSL_AOI22  $SPFDIR/PPG1_AOI22_X1_S110_7TSL.spf   PPG1_AOI22_X1_S110_7TSL
+7TSL_OAI21  $SPFDIR/PPG1_OAI21_X1_0S1_7TSL.spf    PPG1_OAI21_X1_0S1_7TSL
+7TSL_OAI22  $SPFDIR/PPG1_OAI22_X1_0S11_7TSL.spf   PPG1_OAI22_X1_0S11_7TSL
+8TSL_INV    $SPFDIR/PPG1_INV_X2_8TSL.spf          PPG1_INV_X2_8TSL
+8TSL_NAND2B $SPFDIR/PPG1_NAND2_X1_B_8TSL.spf      PPG1_NAND2_X1_B_8TSL
+8TSL_NOR2B  $SPFDIR/PPG1_NOR2_X1_B_8TSL.spf       PPG1_NOR2_X1_B_8TSL
+8TSL_NAND3B $SPFDIR/PPG1_NAND3_X1_B_8TSL.spf      PPG1_NAND3_X1_B_8TSL
+8TSL_AOI21  $SPFDIR/PPG1_AOI21_X1_1S0_8TSL.spf    PPG1_AOI21_X1_1S0_8TSL
+8TSL_AOI22  $SPFDIR/PPG1_AOI22_X1_S110_8TSL.spf   PPG1_AOI22_X1_S110_8TSL
+8TSL_OAI21  $SPFDIR/PPG1_OAI21_X1_0S1_8TSL.spf    PPG1_OAI21_X1_0S1_8TSL
+8TSL_OAI22  $SPFDIR/PPG1_OAI22_X1_0S11_8TSL.spf   PPG1_OAI22_X1_0S11_8TSL
+"
+
+#-----------------------------------------------------------------------------
+# Submit all jobs
+#-----------------------------------------------------------------------------
+for vdd in $VOLTAGES; do
+    vdd_tag=$(echo "$vdd" | sed 's/\./_/g')
+    vdd_dir="$SCRIPTDIR/run_vdd/$vdd_tag"
+    mkdir -p "$vdd_dir"
+
+    # Per-voltage template: inject PVDD and MODEL_INC/LIB from BASESP
+    TEMPLATE="$vdd_dir/invfo3_sweep.sp"
+    patch_netlist "$BASESP" "$TEMPLATE" "" "" "$vdd"
+
+    echo "$CELL_ENTRIES" | while read label spf_file subckt; do
+        [ -z "$label" ] && continue
+        rundir="$vdd_dir/$label"
+        mkdir -p "$rundir"
+
+        # Normalise SPF port order and Vt flavour
+        process_spf "$spf_file" "$rundir/$SPF_OUT"
+
+        # Patch per-cell netlist from per-voltage template (model already injected)
+        patch_netlist "$TEMPLATE" "$rundir/$NETLIST" "$rundir/$SPF_OUT" "$subckt"
+
+        cat > "$rundir/run_hsp.sh" << WRAPPER
+#!/bin/ksh
+export PATH=${HSPICE_BIN}:$PATH
+export LM_LICENSE_FILE=$LM_LICENSE_FILE
+$SCRIPTDIR/hsp_2022_new $rundir/$NETLIST
+WRAPPER
+        chmod +x "$rundir/run_hsp.sh"
+
+        bsub -J "${LSF_JOBPREFIX}_${vdd_tag}_${label}" \
+             -M 128 -n 8 -W 4:00 \
+             -R "select[ $LSF_SELECT ]" \
+             -cwd "$rundir" \
+             "ksh $rundir/run_hsp.sh"
+    done
+done
+
+#-----------------------------------------------------------------------------
+# Wait for all jobs
+#-----------------------------------------------------------------------------
+wait_for_jobs "$LSF_JOBPREFIX"
+
+#-----------------------------------------------------------------------------
+# Collect results — tab-separated, one column per voltage
+#-----------------------------------------------------------------------------
+CELLS='6TSL_INV 6TSL_NAND2B 6TSL_NOR2B 6TSL_NAND3B 6TSL_AOI21 6TSL_AOI22 6TSL_OAI21 6TSL_OAI22
+       7TSL_INV 7TSL_NAND2B 7TSL_NOR2B 7TSL_NAND3B 7TSL_AOI21 7TSL_AOI22 7TSL_OAI21 7TSL_OAI22
+       8TSL_INV 8TSL_NAND2B 8TSL_NOR2B 8TSL_NAND3B 8TSL_AOI21 8TSL_AOI22 8TSL_OAI21 8TSL_OAI22'
+
+printf "" > "$RESULTS14"
+echo "Collecting results -> $RESULTS14"
+
+for label in $CELLS; do
+    {
+        _row() { local metric=$1; printf "%s_%s" "$label" "$metric"
+            for vdd in $VOLTAGES; do
+                vdd_tag=$(echo "$vdd" | sed 's/\./_/g')
+                lis="$SCRIPTDIR/run_vdd/$vdd_tag/$label/${NETLIST}.lis"
+                val=$(grep "${metric}=" "$lis" 2>/dev/null | awk '{print $NF}')
+                printf "\t%s" "${val:--}"
+            done
+            printf "\n"
+        }
+        # stage_delay row has no prefix suffix
+        printf "%s" "$label"
+        for vdd in $VOLTAGES; do
+            vdd_tag=$(echo "$vdd" | sed 's/\./_/g')
+            lis="$SCRIPTDIR/run_vdd/$vdd_tag/$label/${NETLIST}.lis"
+            val=$(grep "stage_delay=" "$lis" 2>/dev/null | awk '{print $NF}')
+            printf "\t%s" "${val:--}"
+        done
+        printf "\n"
+        _row iddq
+        _row iddarail_qcorr
+        _row acceffrail_qcorr
+        _row acreffrail_qcorr
+    } >> "$RESULTS14"
+done
+
+echo ""
+echo "Done. Model: $MODEL_NAME   Results: $RESULTS14"

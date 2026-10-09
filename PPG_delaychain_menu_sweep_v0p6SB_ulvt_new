@@ -1,0 +1,132 @@
+#!/bin/ksh
+#=============================================================================
+# PPG_delaychain_menu_sweep_v0p6SB_ulvt_new
+# Purpose : Run HSPICE single-stage delay-chain simulations for 24 cell types
+#           (6TSL / 7TSL / 8TSL) at a single VDD.
+#           Results are collected into PPGRO_chain_menu.txt.
+#
+# REQUIRED PARAMETERS (env vars, set before running):
+#   MODEL_INC  — full path to design_include.inc for the desired model
+#   MODEL_LIB  — full path to fixed_corner.lib for the desired model
+#   MODEL_NAME — short label, e.g. "v0.6SB"  "v0.22"  "v1.0"
+#
+# OPTIONAL PARAMETERS:
+#   SPFDIR     — override the default SPF source directory
+#   VT         — Vt substitution target, default "ulvt"  (set to "slvt" to skip)
+#
+# Example:
+#   MODEL_INC='/afs/.../Spice-XXXXXX/design_include.inc' \
+#   MODEL_LIB='/afs/.../Spice-XXXXXX/fixed_corner.lib' \
+#   MODEL_NAME='vX.Y' \
+#   ksh PPG_delaychain_menu_sweep_v0p6SB_ulvt_new
+#=============================================================================
+
+SCRIPTDIR='/afs/apd.pok.ibm.com/u/imranyou/for_imran'
+
+# Load shared library
+. "$SCRIPTDIR/ppg_sim_lib.sh"
+
+#-----------------------------------------------------------------------------
+# Configuration
+#-----------------------------------------------------------------------------
+SPFDIR="${SPFDIR:-/gpfs/projects/t/titan/dtco/usr/sbajaj/SPF_files/tpdk0.6sb}"
+TEMPLATE="$SCRIPTDIR/invfo3_sweep.sp"
+SPF_OUT='PPGchain.spf'
+NETLIST='invfo3_mod.sp'
+RESULTS="$SCRIPTDIR/PPGRO_chain_menu.txt"
+LSF_SELECT='(osver==rh8) && (type == X86_64) && ! etx && ! nojobs'
+LSF_JOBPREFIX='PPGsim'
+HSPICE_BIN='/afs/apd.pok.ibm.com/ant/cad_tools/synopsys/Hspice/T-2022.06-SP2/hspice/hspice/T-2022.06-SP2/hspice/bin'
+
+# Validate model parameters (exits if any are missing or files not found)
+validate_model_params
+
+CELL_LABELS=''
+
+#-----------------------------------------------------------------------------
+# run_cell <label> <spf_file> <subckt_name>
+#   Prepare per-cell SPF and netlist, then submit one LSF job.
+#-----------------------------------------------------------------------------
+run_cell() {
+    local label=$1 spf_file=$2 subckt=$3
+    local rundir="$SCRIPTDIR/run/$label"
+    mkdir -p "$rundir"
+
+    echo "Submitting: $label"
+
+    # Normalise SPF port order and Vt flavour
+    process_spf "$spf_file" "$rundir/$SPF_OUT"
+
+    # Inject model, SPF path, and subckt into the template; verify result
+    patch_netlist "$TEMPLATE" "$rundir/$NETLIST" "$rundir/$SPF_OUT" "$subckt"
+
+    # Per-job wrapper
+    cat > "$rundir/run_hsp.sh" << WRAPPER
+#!/bin/ksh
+export PATH=${HSPICE_BIN}:$PATH
+export LM_LICENSE_FILE=$LM_LICENSE_FILE
+$SCRIPTDIR/hsp_2022_new $rundir/$NETLIST
+WRAPPER
+    chmod +x "$rundir/run_hsp.sh"
+
+    bsub -J "${LSF_JOBPREFIX}_${label}" \
+         -M 128 -n 8 -W 4:00 \
+         -R "select[ $LSF_SELECT ]" \
+         -cwd "$rundir" \
+         "ksh $rundir/run_hsp.sh"
+
+    CELL_LABELS="$CELL_LABELS $label"
+}
+
+#-----------------------------------------------------------------------------
+# Cell list
+#-----------------------------------------------------------------------------
+printf "" > "$RESULTS"
+mkdir -p "$SCRIPTDIR/run"
+
+run_cell 6TSL_INV    "$SPFDIR/PPG1_INV_X2_6TSL.spf"          PPG1_INV_X2_6TSL
+run_cell 6TSL_NAND2B "$SPFDIR/PPG1_NAND2_X1_B_6TSL.spf"      PPG1_NAND2_X1_B_6TSL
+run_cell 6TSL_NOR2B  "$SPFDIR/PPG1_NOR2_X1_B_6TSL.spf"       PPG1_NOR2_X1_B_6TSL
+run_cell 6TSL_NAND3B "$SPFDIR/PPG1_NAND3_X1_B_6TSL.spf"      PPG1_NAND3_X1_B_6TSL
+run_cell 6TSL_AOI21  "$SPFDIR/PPG1_AOI21_X1_1S0_6TSL.spf"    PPG1_AOI21_X1_1S0_6TSL
+run_cell 6TSL_AOI22  "$SPFDIR/PPG1_AOI22_X1_S110_6TSL.spf"   PPG1_AOI22_X1_S110_6TSL
+run_cell 6TSL_OAI21  "$SPFDIR/PPG1_OAI21_X1_0S1_6TSL.spf"    PPG1_OAI21_X1_0S1_6TSL
+run_cell 6TSL_OAI22  "$SPFDIR/PPG1_OAI22_X1_0S11_6TSL.spf"   PPG1_OAI22_X1_0S11_6TSL
+run_cell 7TSL_INV    "$SPFDIR/PPG1_INV_X2_7TSL.spf"          PPG1_INV_X2_7TSL
+run_cell 7TSL_NAND2B "$SPFDIR/PPG1_NAND2_X1_B_7TSL.spf"      PPG1_NAND2_X1_B_7TSL
+run_cell 7TSL_NOR2B  "$SPFDIR/PPG1_NOR2_X1_B_7TSL.spf"       PPG1_NOR2_X1_B_7TSL
+run_cell 7TSL_NAND3B "$SPFDIR/PPG1_NAND3_X1_B_7TSL.spf"      PPG1_NAND3_X1_B_7TSL
+run_cell 7TSL_AOI21  "$SPFDIR/PPG1_AOI21_X1_1S0_7TSL.spf"    PPG1_AOI21_X1_1S0_7TSL
+run_cell 7TSL_AOI22  "$SPFDIR/PPG1_AOI22_X1_S110_7TSL.spf"   PPG1_AOI22_X1_S110_7TSL
+run_cell 7TSL_OAI21  "$SPFDIR/PPG1_OAI21_X1_0S1_7TSL.spf"    PPG1_OAI21_X1_0S1_7TSL
+run_cell 7TSL_OAI22  "$SPFDIR/PPG1_OAI22_X1_0S11_7TSL.spf"   PPG1_OAI22_X1_0S11_7TSL
+run_cell 8TSL_INV    "$SPFDIR/PPG1_INV_X2_8TSL.spf"          PPG1_INV_X2_8TSL
+run_cell 8TSL_NAND2B "$SPFDIR/PPG1_NAND2_X1_B_8TSL.spf"      PPG1_NAND2_X1_B_8TSL
+run_cell 8TSL_NOR2B  "$SPFDIR/PPG1_NOR2_X1_B_8TSL.spf"       PPG1_NOR2_X1_B_8TSL
+run_cell 8TSL_NAND3B "$SPFDIR/PPG1_NAND3_X1_B_8TSL.spf"      PPG1_NAND3_X1_B_8TSL
+run_cell 8TSL_AOI21  "$SPFDIR/PPG1_AOI21_X1_1S0_8TSL.spf"    PPG1_AOI21_X1_1S0_8TSL
+run_cell 8TSL_AOI22  "$SPFDIR/PPG1_AOI22_X1_S110_8TSL.spf"   PPG1_AOI22_X1_S110_8TSL
+run_cell 8TSL_OAI21  "$SPFDIR/PPG1_OAI21_X1_0S1_8TSL.spf"    PPG1_OAI21_X1_0S1_8TSL
+run_cell 8TSL_OAI22  "$SPFDIR/PPG1_OAI22_X1_0S11_8TSL.spf"   PPG1_OAI22_X1_0S11_8TSL
+
+#-----------------------------------------------------------------------------
+# Wait for all jobs, then collect results
+#-----------------------------------------------------------------------------
+wait_for_jobs "$LSF_JOBPREFIX"
+
+echo "Collecting results -> $RESULTS"
+for label in $CELL_LABELS; do
+    rundir="$SCRIPTDIR/run/$label"
+    lisfile="$rundir/${NETLIST}.lis"
+    printf "%s\n" "$label"            >> "$RESULTS"
+    grep power_supply      "$lisfile" >> "$RESULTS"
+    grep temp              "$lisfile" >> "$RESULTS"
+    grep iddarail_qcorr=   "$lisfile" >> "$RESULTS"
+    grep iddq=             "$lisfile" >> "$RESULTS"
+    grep stage_delay=      "$lisfile" >> "$RESULTS"
+    grep acceffrail_qcorr= "$lisfile" >> "$RESULTS"
+    grep acreffrail_qcorr= "$lisfile" >> "$RESULTS"
+done
+
+echo ""
+echo "Done. Model: $MODEL_NAME   Results: $RESULTS"
