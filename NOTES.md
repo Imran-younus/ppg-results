@@ -190,3 +190,31 @@ no backreference needed, no quoting fragility.
 **Rule:** In `/bin/ksh` `printf` strings destined for sed scripts, avoid
 backreferences (`\1`, `\2`). Use address/command separation instead.
 
+
+---
+
+## 9. GitHub push — always use the token file, never `git push origin main`
+
+**Symptom:** `git push origin main` fails with "No such device or address" —
+interactive HTTPS credentials are not available in this login shell.
+
+**Token file:** `/afs/apd.pok.ibm.com/u/imranyou/.github_token`
+**Remote:** `https://github.com/Imran-younus/ppg-results.git`
+**Branch:** `main`
+
+**Fix — always use:**
+```sh
+TOKEN=$(grep "^GITHUB_TOKEN=" /afs/apd.pok.ibm.com/u/imranyou/.github_token | cut -d= -f2)
+git push "https://${TOKEN}@github.com/Imran-younus/ppg-results.git" main
+```
+
+If rejected with "fetch first" (remote diverged):
+```sh
+git pull "https://${TOKEN}@github.com/Imran-younus/ppg-results.git" main --rebase
+# If conflicts and our results are authoritative:
+git rebase --abort
+git push --force "https://${TOKEN}@github.com/Imran-younus/ppg-results.git" main
+```
+
+**Staging rule:** never `git add .` — explicitly name each file to avoid
+committing hundreds of per-cell `run_vdd/` netlists.
