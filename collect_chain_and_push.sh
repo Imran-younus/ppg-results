@@ -180,3 +180,15 @@ echo ""
 echo "$(date): All cells passed. Model: $MODEL_NAME"
 echo "$(date): Results written to: $RESULT_FILE"
 cat "$RESULT_FILE"
+
+#-----------------------------------------------------------------------------
+# 8. Automated Dataset Consistency Check
+#-----------------------------------------------------------------------------
+if [ -f "$REPO_ROOT/verify_dataset_consistency.js" ]; then
+    echo ""
+    echo "Running automated dataset consistency check..."
+    node "$REPO_ROOT/verify_dataset_consistency.js" "$REPO_ROOT/index.html" "$REPO_ROOT/ppg_results.html" || {
+        echo "ABORT: Consistency check failed. Cross-model or delta mismatch detected." >&2
+        exit 1
+    }
+fi

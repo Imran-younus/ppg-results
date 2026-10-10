@@ -193,16 +193,18 @@ backreferences (`\1`, `\2`). Use address/command separation instead.
 
 ---
 
-## 8. HTML dashboard dataset synchronization — avoid cross-model single vs chain delta distortion
+## 8. HTML Dataset Synchronization & Cross-Model Delta Distortion
 
-**Symptom:** On the HTML comparison page (Page ③ Single Stage vs Chain Comparison), selecting model `v0.6SB` showed an inflated delta (+17.5% to +20.6% delay, +11.8% to +19.1% ACReff) compared to `v0.6SB2` (~8.6% delay, ~3.7% ACReff).
+**Symptom:** On Page ③ (*Single Stage vs Chain Comparison*), selecting model `v0.6SB` showed an inflated delta (+17.5% to +20.6% delay, +11.8% to +19.1% ACReff) compared to `v0.6SB2` (~6.4% to ~8.6% delay, ~3.7% ACReff).
 
-**Root cause:** In `index.html`, the single-stage VDD sweep arrays registered under `v0p6SB_SLVT_TT` were inadvertently populated with `v0.6SB2` simulation data (`7TSL_INV`: 6.339 ps @ 0.7V) instead of the actual `v0.6SB` simulation data (`7TSL_INV`: 6.856 ps @ 0.7V from `PPGRO_chain_menu14_v0p6SB_slvt.txt`). Comparing the faster `v0.6SB2` single-stage numbers against slower `v0.6SB` chain numbers created an artificial cross-model delta mismatch.
+**Root cause:** In `index.html`, the single-stage VDD sweep arrays registered under `v0p6SB_SLVT_TT` were retaining `v0.6SB2` simulation data (`7TSL_INV`: 6.339 ps @ 0.7V) instead of the actual `v0.6SB` simulation data (`7TSL_INV`: 6.856 ps @ 0.7V from `PPGRO_chain_menu14_v0p6SB_slvt.txt`). Comparing faster v0.6SB2 single-stage numbers against slower v0.6SB chain numbers created an artificial cross-model delta inflation.
 
-**Fix:**
-1. Populated `index.html` with the verified `v0.6SB` single-stage sweep simulation arrays (matching `ppg_results.html` and `PPGRO_chain_menu14_v0p6SB_slvt.txt`).
-2. Updated dynamic comparison legend notes and takeaways to compute exact live deltas (~6.6% delay, ~2.7% Ceff, ~3.8% ACReff) across both models.
-3. Kept `index.html` and `ppg_results.html` 100% synchronized.
+**Mandatory Rules Going Forward:**
+1. **Single Model Provenance:** Single-stage data (`rr(id, cell, ...)`), chain data (`chain_cells`), and HTML metadata (`model`, `chain_meta.model`) within any registered dataset must all come from the exact same model version and simulation sandbox.
+2. **No Dataset Mixing:** Never copy an existing dataset entry without replacing all 14-point sweep arrays with verified numbers directly extracted from the target model's `PPGRO_chain_menu14_${MODEL_NAME}.txt`.
+3. **Model Name Validation:** Validate model names in metadata and verify that `ds.model === ds.chain_meta.model` before generating or updating HTML.
+4. **Pre-Publish Cross-Check:** HTML values must be cross-checked against source simulation files before publishing.
+5. **Automated Consistency Check:** Run `node verify_dataset_consistency.js <html_file>` prior to any push. The script flags any single-stage vs chain delta outside the physical topology range (+2% to +12%) or any cross-model metadata discrepancy.
 
 ## 9. GitHub push — always use the token file, never `git push origin main`
 
