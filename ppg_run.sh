@@ -1,17 +1,129 @@
 #!/bin/ksh
 #=============================================================================
 # ppg_run.sh — Interactive PPG Simulation Launcher
+#=============================================================================
 #
-# Usage:  ksh ppg_run.sh
+# ── QUICK START ───────────────────────────────────────────────────────────────
 #
-# Prompts you for all parameters, validates inputs, runs simulations via
-# LSF, collects results, and pushes to GitHub.
+#   Open a terminal in the simulation directory and run:
 #
-# ── HOW TO ADD NEW OPTIONS IN FUTURE ─────────────────────────────────
-#   VT types     → add to VT_OPTIONS list below (one per line)
-#   Track heights → add to TRACK_OPTIONS list below
-#   Cell types   → add to CELLTYPE_OPTIONS list below
-#   No logic changes needed — just extend the lists.
+#       ksh ppg_run.sh
+#
+#   The script will ask you questions one at a time.
+#   Press Enter to accept the default value shown in [brackets].
+#
+# ── WHAT THE SCRIPT DOES ──────────────────────────────────────────────────────
+#
+#   1. Asks you a series of questions (see PROMPTS section below).
+#   2. Shows you a summary of what it is about to run.
+#   3. Asks "Proceed? (yes/no)" — nothing is submitted until you say yes.
+#   4. Submits HSPICE simulation jobs to the LSF cluster.
+#   5. Waits for all jobs to finish.
+#   6. Collects results into a text file.
+#   7. Optionally commits and pushes results to GitHub.
+#
+# ── PROMPTS — what you will be asked ─────────────────────────────────────────
+#
+#   Step 1 — Simulation mode
+#       single  →  Single-stage VDD sweep (the standard 24-cell, 5-metric run)
+#       chain   →  101-stage ring oscillator chain (7 cells, SLVT only)
+#
+#   Step 2 — Model parameters
+#       Model name  : Short label you choose, e.g.  v0.6SB  or  v0.7RC1
+#                     This label appears in result filenames and on the website.
+#       INC path    : Full path to the design_include.inc file for this model.
+#                     Example: /gpfs/.../Spice-260724-sandbox/design_include.inc
+#       LIB path    : Full path to the fixed_corner.lib file for this model.
+#                     MUST be from the same sandbox folder as the INC file.
+#                     Example: /gpfs/.../Spice-260724-sandbox/fixed_corner.lib
+#       The script will warn you if INC and LIB appear to be from different
+#       sandbox directories (which would produce incorrect mixed-model results).
+#
+#   Step 3 — Vt flavor
+#       Choose from the numbered menu (e.g. 1 for slvt, 2 for ulvt).
+#       You can also type the key directly (e.g. slvt).
+#       Default is slvt.
+#       Note: chain mode only supports slvt at this time.
+#
+#   Step 4 — VDD (supply voltage)
+#       sweep       →  Full 14-point sweep from 0.5 V to 1.15 V  [default]
+#       0.70        →  Single voltage point
+#       0.6 0.7 0.8 →  Space-separated list of specific voltages
+#       Chain mode always simulates one voltage; default is 0.70 V.
+#
+#   Step 5 — Temperature
+#       Integer in degrees Celsius.  Default is 25.
+#       Examples: 25  125  -40
+#
+#   Step 6 — Track height filter  (single-stage mode only)
+#       all  →  Run all track heights (6T, 7T, 8T)  [default]
+#       6T   →  6-track cells only
+#       7T   →  7-track cells only
+#       8T   →  8-track cells only
+#
+#   Step 7 — Cell type filter  (single-stage mode only)
+#       all   →  All cell types  [default]
+#       INV   →  Inverters only
+#       NAND  →  NAND gates only  (NAND2B, NAND2T, NAND3B, NAND3T)
+#       NOR   →  NOR gates only   (NOR2B, NOR2T)
+#       AOI   →  AOI gates only   (AOI21, AOI22)
+#       OAI   →  OAI gates only   (OAI21, OAI22)
+#       Combining track + cell filters works: e.g. 7T + NAND → runs only
+#       7TSL_NAND2B and 7TSL_NAND3B.
+#
+#   Step 8 — GitHub push
+#       yes  →  After results are collected, commit and push to GitHub  [default]
+#       no   →  Skip — results are saved locally only
+#
+# ── RESULT FILES ─────────────────────────────────────────────────────────────
+#
+#   Single-stage full sweep → PPGRO_chain_menu14_<MODEL>_<VT>.txt
+#   Single-stage partial    → PPGRO_chain_<MODEL>_<VT>_results.txt
+#   101-stage chain         → chain_results_<MODEL>.txt
+#
+# ── HOW TO ADD NEW OPTIONS IN FUTURE ─────────────────────────────────────────
+#
+#   All configurable lists are defined right below this comment block,
+#   in clearly labelled sections.  To add a new option:
+#
+#   New Vt flavor (e.g. ZVT):
+#       Open ppg_run.sh, find the VT_OPTIONS block, add one line:
+#           zvt    ZVT    (Zero-Vt)
+#       That's it.  The menu, validation, and filename logic all pick it up
+#       automatically.
+#
+#   New track height (e.g. 9T):
+#       Find the TRACK_OPTIONS block, add one line:
+#           9T   9-track cells only
+#       Then add the 9T cells to PPG_STD_CELLS_24 in ppg_sim_lib.sh.
+#
+#   New cell type filter (e.g. MUX):
+#       Find the CELLTYPE_OPTIONS block, add one line:
+#           MUX    MUX gates only
+#       Then add the MUX cells to PPG_STD_CELLS_24 in ppg_sim_lib.sh.
+#
+#   No changes to any other part of the script are needed.
+#
+# ── TROUBLESHOOTING ───────────────────────────────────────────────────────────
+#
+#   "File not found" on INC or LIB path
+#       → Check the path is correct and the filesystem is mounted.
+#         You can verify with:  ls /gpfs/.../Spice-XXXXXX-sandbox/
+#
+#   "Sandbox mismatch" warning
+#       → INC and LIB are from different Spice-*-sandbox directories.
+#         This will produce wrong results.  Use matching paths.
+#
+#   Jobs finish but results show "failed"
+#       → Check the .lis file in the cell run directory:
+#         cat run_vdd_<MODEL>_slvt/0_7/<CELL>/invfo3_mod.sp.lis | grep -i fail
+#         See NOTES.md for the full debugging checklist.
+#
+#   GitHub push fails
+#       → Verify the token file exists:
+#         cat /afs/apd.pok.ibm.com/u/imranyou/.github_token
+#         It should contain a line:  GITHUB_TOKEN=ghp_...
+#
 #=============================================================================
 
 SCRIPTDIR=$(cd "$(dirname "$0")" && pwd)
