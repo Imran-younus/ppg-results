@@ -103,9 +103,13 @@ for vdd in $VOLTAGES; do
     TEMPLATE="$vdd_dir/invfo3_sweep.sp"
     patch_netlist "$BASESP" "$TEMPLATE" "" "" "$vdd" "$TEMP"
 
-    # 2. Iterate through all 24 cells
+    # 2. Iterate through cells (all 24, or subset if CELL_FILTER is set)
     echo "$PPG_STD_CELLS_24" | while read label spf_name subckt; do
         [ -z "$label" ] && continue
+        # Skip if caller provided a filter list and this cell is not in it
+        if [ -n "$CELL_FILTER" ]; then
+            echo " $CELL_FILTER " | grep -q " $label " || continue
+        fi
         cell_rundir="$vdd_dir/$label"
         mkdir -p "$cell_rundir"
         spf_source="$SPFDIR/$spf_name"
