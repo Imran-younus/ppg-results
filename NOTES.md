@@ -193,6 +193,17 @@ backreferences (`\1`, `\2`). Use address/command separation instead.
 
 ---
 
+## 8. HTML dashboard dataset synchronization — avoid cross-model single vs chain delta distortion
+
+**Symptom:** On the HTML comparison page (Page ③ Single Stage vs Chain Comparison), selecting model `v0.6SB` showed an inflated delta (+17.5% to +20.6% delay, +11.8% to +19.1% ACReff) compared to `v0.6SB2` (~8.6% delay, ~3.7% ACReff).
+
+**Root cause:** In `index.html`, the single-stage VDD sweep arrays registered under `v0p6SB_SLVT_TT` were inadvertently populated with `v0.6SB2` simulation data (`7TSL_INV`: 6.339 ps @ 0.7V) instead of the actual `v0.6SB` simulation data (`7TSL_INV`: 6.856 ps @ 0.7V from `PPGRO_chain_menu14_v0p6SB_slvt.txt`). Comparing the faster `v0.6SB2` single-stage numbers against slower `v0.6SB` chain numbers created an artificial cross-model delta mismatch.
+
+**Fix:**
+1. Populated `index.html` with the verified `v0.6SB` single-stage sweep simulation arrays (matching `ppg_results.html` and `PPGRO_chain_menu14_v0p6SB_slvt.txt`).
+2. Updated dynamic comparison legend notes and takeaways to compute exact live deltas (~6.6% delay, ~2.7% Ceff, ~3.8% ACReff) across both models.
+3. Kept `index.html` and `ppg_results.html` 100% synchronized.
+
 ## 9. GitHub push — always use the token file, never `git push origin main`
 
 **Symptom:** `git push origin main` fails with "No such device or address" —

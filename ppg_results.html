@@ -271,10 +271,10 @@ footer{border-top:1px solid var(--border);margin-top:40px;padding-top:12px;text-
 <section>
   <div class="section-title"><span class="bar"></span><span id="chain-section-title">101-Stage Chain — Per-Stage Values</span><span class="pg">②</span></div>
   <div class="info-box info">
-    <strong style="color:var(--accent2)">ℹ HSPICE .measure divides by STAGES=101 internally.</strong>
+    <strong style="color:var(--accent2)">ℹ <span id="chain-infobox-stages">HSPICE .measure divides by STAGES internally.</span></strong>
     Values below are already per-stage and directly comparable to single-stage simulation results.
-    <code>stage_delay = delay₂ ÷ (2×STAGES)</code> &nbsp;·&nbsp; <code>ceff</code> and <code>acreff</code> are intrinsic per-stage quantities.
-    Ring oscillator frequency is computed as <code>f = 1 ÷ (2 × stage_delay × STAGES)</code>.
+    <code id="chain-infobox-formula-delay">stage_delay = delay₂ ÷ (2×STAGES)</code> &nbsp;·&nbsp; <code>ceff</code> and <code>acreff</code> are intrinsic per-stage quantities.
+    Ring oscillator frequency is computed as <code id="chain-infobox-formula-freq">f = 1 ÷ (2 × stage_delay × STAGES)</code>.
   </div>
   <p class="vdd-hint" id="chain-conditions" style="margin-bottom:12px"></p>
   <div class="table-wrap">
@@ -373,14 +373,11 @@ footer{border-top:1px solid var(--border);margin-top:40px;padding-top:12px;text-
   <!-- Legend + context notes -->
   <div class="legend-box">
     <div class="legend-row">
-      <span><span class="legend-dot" style="background:#00d4ff"></span><strong style="color:#00d4ff">Single Stage</strong> — isolated single-cell SPICE simulation · VDD sweep · SLVT</span>
-      <span><span class="legend-dot" style="background:#ff6b35"></span><strong style="color:#ff6b35">Chain Per-Stage</strong> — 101-stage ring oscillator · per-stage values · SLVT</span>
+      <span><span class="legend-dot" style="background:#00d4ff"></span><strong style="color:#00d4ff">Single Stage</strong> — isolated single-cell SPICE simulation · VDD sweep · <span id="corr-legend-single-vt"></span></span>
+      <span><span class="legend-dot" style="background:#ff6b35"></span><strong style="color:#ff6b35">Chain Per-Stage</strong> — <span id="corr-legend-chain-stages"></span>-stage ring oscillator · per-stage values · <span id="corr-legend-chain-vt"></span></span>
     </div>
-    <div class="legend-notes">
-      <div><span style="color:var(--yellow)">⚠ Stage Delay (~44% higher in chain):</span> Both datasets are SLVT, same model. Delta is <strong>topology-driven</strong> — the 101-stage ring accumulates wire parasitics and load coupling absent in the isolated single-stage cell.</div>
-      <div><span style="color:var(--pink)">⚠ IDDQ — not comparable:</span> Single-stage = DC static leakage (FIND AT=0 ps). Chain = dynamic switching current per stage. Fundamentally different measurement quantities.</div>
-      <div><span style="color:var(--yellow)">⚠ Ceff / ACCeff (~8% lower in chain):</span> Chain per-stage Ceff is slightly lower than single-stage ACCeff — the ring cell drives a weaker net load than the explicit FO3 test load in the isolated cell.</div>
-      <div><span style="color:var(--yellow)">⚠ ACReff (~56% higher in chain):</span> Largest delta metric — ring extra wire resistance dominates. The intrinsic device V/I ratio is inflated by interconnect RC. Units unified to KΩ for direct comparison.</div>
+    <div class="legend-notes" id="corr-legend-notes">
+      <!-- populated dynamically by renderTopoPage() -->
     </div>
   </div>
 
@@ -1304,7 +1301,10 @@ function buildFomChart(){
     data:ct.map(c=>{const k=tsl+'_'+c;if(!D_[k])return null;return(D_[k].stage_delay[vi]||0)*(D_[k].acreff[vi]||0);}),
     backgroundColor:tslColor(tsl)+'99',borderColor:tslColor(tsl),borderWidth:2,borderRadius:3
   }));
-  document.getElementById('fomChart-sub').textContent=`Stage Delay × ACReff — lower is better · VDD = ${vddArr[vi]}V · Drops ~53% from ${tiers[0]}→${tiers[tiers.length-1]} INV`;
+  const fomInvVals=tiers.map(t=>(D_[t+'_INV']?.stage_delay[vi]||0)*(D_[t+'_INV']?.acreff[vi]||0)).filter(v=>v>0);
+  const fomDrop=fomInvVals.length>1?Math.round((1-fomInvVals[fomInvVals.length-1]/fomInvVals[0])*100):null;
+  const fomDropStr=fomDrop!==null?` · Drops ~${fomDrop}% from ${tiers[0]}→${tiers[tiers.length-1]} INV`:'';
+  document.getElementById('fomChart-sub').textContent=`Stage Delay × ACReff — lower is better · VDD = ${vddArr[vi]}V${fomDropStr}`;
   if(fomObj){fomObj.destroy();}
   fomObj=new Chart(document.getElementById('fomChart'),{type:'bar',
     data:{labels:ct,datasets},
@@ -1426,6 +1426,9 @@ function renderChainPage(){
   document.getElementById('chain-section-title').textContent=`${cm.stages}-Stage Chain — Per-Stage Values (${cm.vt})`;
   document.getElementById('chain-chart-title').textContent=`Per-Stage Metrics — ${cm.vt} · VDD = ${cm.vdd}`;
   document.getElementById('chain-conditions').textContent=`${cm.simulator} · ${cm.model} · ${cm.vt} · ${cm.corner} · T = ${cm.temp} · VDD = ${cm.vdd} · ${cm.stages} stages`;
+  document.getElementById('chain-infobox-stages').textContent=`HSPICE .measure divides by STAGES=${cm.stages} internally.`;
+  document.getElementById('chain-infobox-formula-delay').textContent=`stage_delay = delay₂ ÷ (2×${cm.stages})`;
+  document.getElementById('chain-infobox-formula-freq').textContent=`f = 1 ÷ (2 × stage_delay × ${cm.stages})`;
 
   // Table with ring frequency
   const maxSD=Math.max(...cc.map(c=>c.stage_delay));
@@ -1526,6 +1529,11 @@ function renderTopoPage(){
   document.getElementById('topo-meta-single').textContent=`${d.simulator} · ${d.model} · ${d.vt} · ${d.corner} · T = ${d.temp} · VDD = ${vddLabel}`;
   document.getElementById('topo-meta-chain').textContent=`${cm.simulator} · ${cm.model} · ${cm.vt} · ${cm.corner} · T = ${cm.temp} · VDD = ${cm.vdd} · ${cm.stages} stages`;
 
+  // Populate dynamic legend-row spans
+  document.getElementById('corr-legend-single-vt').textContent=d.vt;
+  document.getElementById('corr-legend-chain-stages').textContent=cm.stages;
+  document.getElementById('corr-legend-chain-vt').textContent=cm.vt;
+
   const barSub=`VDD = ${vddLabel} · ${d.corner} · T = ${d.temp} · Cyan = Single Stage · Orange = Chain Per-Stage · Both: ${d.model}`;
   ['delay','ceff','acreff'].forEach(k=>document.getElementById('corr-bar-'+k+'-sub').textContent=barSub);
   document.getElementById('corr-pct-sub').textContent=`Stage Delay & Ceff only — IDDQ excluded (not directly comparable) · VDD = ${vddLabel}`;
@@ -1625,18 +1633,32 @@ function renderTopoPage(){
     {label:'1:1 ref',data:refLine(cfPts),type:'line',borderColor:'#ffffff33',borderWidth:1,borderDash:[5,5],pointRadius:0,fill:false,order:0}
   ]},options:scOpts('ACCeff (fF)','Ceff (fF)')});
 
-  // Takeaways
-  const sdDeltas=pairs.map(p=>((p.chainCell.stage_delay-p.singleCell.stage_delay[vi])/p.singleCell.stage_delay[vi]*100));
-  const cfDeltas=pairs.map(p=>((p.chainCell.ceff-p.singleCell.acceff[vi]*1e15)/(p.singleCell.acceff[vi]*1e15)*100));
-  const arDeltas=pairs.map(p=>((p.chainCell.acreff-p.singleCell.acreff[vi]/1000)/(p.singleCell.acreff[vi]/1000)*100));
-  const avg=a=>(a.reduce((s,v)=>s+v,0)/a.length).toFixed(1);
-  const rng=a=>`${Math.min(...a).toFixed(1)}–${Math.max(...a).toFixed(1)}`;
-  document.getElementById('topo-takeaway-list').innerHTML=`
-    <li><strong>Stage delay delta of ~${avg(sdDeltas)}% is systematic across all ${pairs.length} matched cell types</strong> (range: ${rng(sdDeltas)}%). The tight range confirms this is a topology effect — not cell-specific. The 101-stage ring accumulates wire parasitics and load coupling absent in the isolated cell.</li>
-    <li><strong>Ceff / ACCeff delta (~${avg(cfDeltas)}%)</strong>: Chain per-stage Ceff is slightly lower than single-stage ACCeff — the ring cell drives a weaker net load than the explicit FO3 test load. The ring's additional delay is not explained by capacitance; it is dominated by interconnect RC resistance.</li>
-    <li><strong>ACReff delta (~${avg(arDeltas)}%) is the largest metric delta</strong> (range: ${rng(arDeltas)}%). The ring's extra wire resistance inflates the intrinsic V/I ratio significantly beyond the isolated-cell value. Units unified to KΩ for direct comparison.</li>
-    <li><strong>IDDQ values are not compared</strong>: single-stage IDDQ is a DC static leakage (measured at t=0 ps) while chain per-stage IDDQ is a dynamic switching current in an oscillating ring — fundamentally different physical quantities.</li>`;
-}
+  // Takeaways + legend-notes (both computed from live data)
+    const sdDeltas=pairs.map(p=>((p.chainCell.stage_delay-p.singleCell.stage_delay[vi])/p.singleCell.stage_delay[vi]*100));
+    const cfDeltas=pairs.map(p=>((p.chainCell.ceff-p.singleCell.acceff[vi]*1e15)/(p.singleCell.acceff[vi]*1e15)*100));
+    const arDeltas=pairs.map(p=>((p.chainCell.acreff-p.singleCell.acreff[vi]/1000)/(p.singleCell.acreff[vi]/1000)*100));
+    const avg=a=>(a.reduce((s,v)=>s+v,0)/a.length).toFixed(1);
+    const rng=a=>`${Math.min(...a).toFixed(1)}–${Math.max(...a).toFixed(1)}`;
+    const sdSign=parseFloat(avg(sdDeltas))>0?'higher':'lower';
+    const cfSign=parseFloat(avg(cfDeltas))>0?'higher':'lower';
+    const arSign=parseFloat(avg(arDeltas))>0?'higher':'lower';
+    const absPct=a=>Math.abs(parseFloat(avg(a))).toFixed(1);
+    const sameModel=d.model===cm.model?`same model (${d.model})`:`${d.model} (single) vs ${cm.model} (chain)`;
+  
+    // Dynamic legend-notes
+    document.getElementById('corr-legend-notes').innerHTML=`
+      <div><span style="color:var(--yellow)">⚠ Stage Delay (~${absPct(sdDeltas)}% ${sdSign} in chain):</span> Both datasets are ${d.vt}, ${sameModel}. Delta is <strong>topology-driven</strong> — the ${cm.stages}-stage ring accumulates wire parasitics and load coupling absent in the isolated single-stage cell.</div>
+      <div><span style="color:var(--pink)">⚠ IDDQ — not comparable:</span> Single-stage = DC static leakage (FIND AT=0 ps). Chain = dynamic switching current per stage. Fundamentally different measurement quantities.</div>
+      <div><span style="color:var(--yellow)">⚠ Ceff / ACCeff (~${absPct(cfDeltas)}% ${cfSign} in chain):</span> Chain per-stage Ceff vs single-stage ACCeff. Reflects the slight net load difference between the ring topology and the isolated test cell.</div>
+      <div><span style="color:var(--yellow)">⚠ ACReff (~${absPct(arDeltas)}% ${arSign} in chain):</span> Ring interconnect wire resistance adds ~${absPct(arDeltas)}% to effective resistance. Units unified to KΩ for direct comparison.</div>`;
+  
+    // Dynamic takeaways
+    document.getElementById('topo-takeaway-list').innerHTML=`
+      <li><strong>Stage delay delta of ~${avg(sdDeltas)}% is systematic across all ${pairs.length} matched cell types</strong> (range: ${rng(sdDeltas)}%). The tight range confirms this is a topology effect — not cell-specific. The ${cm.stages}-stage ring accumulates wire parasitics and load coupling absent in the isolated cell.</li>
+      <li><strong>Ceff / ACCeff delta (~${avg(cfDeltas)}%)</strong>: Chain per-stage Ceff vs single-stage ACCeff — reflects the net load difference between the ring topology and the isolated test cell. Wire capacitance in the ring increases effective capacitive load slightly.</li>
+      <li><strong>ACReff delta (~${avg(arDeltas)}%)</strong> (range: ${rng(arDeltas)}%): The ring's extra wire resistance inflates the intrinsic V/I ratio slightly beyond the isolated-cell value. Units unified to KΩ for direct comparison.</li>
+      <li><strong>IDDQ values are not compared</strong>: single-stage IDDQ is a DC static leakage (measured at t=0 ps) while chain per-stage IDDQ is a dynamic switching current in an oscillating ring — fundamentally different physical quantities.</li>`;
+  }
 
 // ═══════════════════════════════════════════════════════════════════
 // BOOT
