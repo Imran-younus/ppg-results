@@ -126,7 +126,8 @@ footer{border-top:1px solid var(--border);margin-top:40px;padding-top:12px;text-
     <select id="page-select" onchange="switchPage(this.value)">
       <option value="sweep">① Single Stage — VDD Sweep</option>
       <option value="chain">② Chain — Per-Stage Values</option>
-      <option value="topo">③ Single Stage vs Chain Comparison</option>
+      <option value="raw">③ Chain — Raw (Undivided) Totals</option>
+      <option value="topo">④ Single Stage vs Chain Comparison</option>
     </select>
   </div>
   <div class="sel-divider"></div>
@@ -352,11 +353,74 @@ footer{border-top:1px solid var(--border);margin-top:40px;padding-top:12px;text-
 </div><!-- end #page-chain -->
 
 <!-- ═══════════════════════════════════════════════════════ -->
+<!-- PAGE: CHAIN RAW (UNDIVIDED) TOTALS                     -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div id="page-raw" style="display:none">
+<section>
+  <div class="section-title"><span class="bar"></span><span id="raw-section-title">101-Stage Chain — Raw (Undivided) Totals</span><span class="pg">③</span></div>
+  <div class="info-box info">
+    <strong style="color:var(--accent2)">ℹ <span id="raw-infobox-stages">Raw values — NOT divided by STAGES.</span></strong>
+    Values below are the <em>total</em> ring quantities before per-stage normalisation.
+    <code id="raw-infobox-formula-delay">total_half_period = stage_delay × STAGES</code> &nbsp;·&nbsp;
+    <code id="raw-infobox-formula-freq">f = 1 ÷ (2 × total_half_period)</code>
+  </div>
+  <p class="vdd-hint" id="raw-conditions" style="margin-bottom:12px"></p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Cell</th>
+          <th>Total Half-Period (ps)</th>
+          <th>Ceff × STAGES (fF)</th>
+          <th>ACReff × STAGES (KΩ)</th>
+          <th>IDDQ total (nA)</th>
+          <th>Ring Freq (GHz)</th>
+        </tr>
+      </thead>
+      <tbody id="raw-tbody"></tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="section-title"><span class="bar"></span><span id="raw-chart-title">Raw Chain Metrics</span></div>
+  <div class="charts-grid-4">
+    <div class="chart-card">
+      <div class="chart-title">Total Half-Period (ps)</div>
+      <div class="chart-sub" id="raw-sub-delay"></div>
+      <canvas id="raw-delay" height="220"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Ceff × STAGES (fF)</div>
+      <div class="chart-sub" id="raw-sub-ceff"></div>
+      <canvas id="raw-ceff" height="220"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">ACReff × STAGES (KΩ)</div>
+      <div class="chart-sub" id="raw-sub-acreff"></div>
+      <canvas id="raw-acreff" height="220"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">IDDQ total (nA)</div>
+      <div class="chart-sub" id="raw-sub-iddq"></div>
+      <canvas id="raw-iddq" height="220"></canvas>
+    </div>
+  </div>
+</section>
+
+<div class="takeaways" id="raw-takeaways">
+  <h4>Key Takeaways</h4>
+  <ul id="raw-takeaway-list"></ul>
+</div>
+
+</div><!-- end #page-raw -->
+
+<!-- ═══════════════════════════════════════════════════════ -->
 <!-- PAGE: SINGLE STAGE vs CHAIN COMPARISON                 -->
 <!-- ═══════════════════════════════════════════════════════ -->
 <div id="page-topo" style="display:none">
 <section>
-  <div class="section-title"><span class="bar"></span>Single Stage vs Chain Per-Stage — Topology Comparison<span class="pg">③</span></div>
+  <div class="section-title"><span class="bar"></span>Single Stage vs Chain Per-Stage — Topology Comparison<span class="pg">④</span></div>
 
   <!-- Two-line metadata grid -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;font-size:12px;">
@@ -874,9 +938,10 @@ function isVisible(c){return showTsl[cellTsl(c)]&&showCell[cellType(c)];}
 let sweepObj=null,gainSweepObj=null,barObj=null,fomObj=null,
     tradeObj=null,trade2Obj=null,
     chainDelayObj=null,chainCeffObj=null,chainAcreffObj=null,chainIddqObj=null,
+    rawDelayObj=null,rawCeffObj=null,rawAcreffObj=null,rawIddqObj=null,
     corrBarDelay=null,corrBarCeff=null,corrBarAcreff=null,corrPctObj=null,
     corrScDelay=null,corrScCeff=null;
-let chainBuilt=false,topoBuilt=false;
+let chainBuilt=false,rawBuilt=false,topoBuilt=false;
 
 // ═══════════════════════════════════════════════════════════════════
 // SELECTOR BAR — model/vt/corner auto-population
@@ -922,7 +987,7 @@ function switchModel(modelName){
   if(found){
     activeId=found;
     resetFiltersForDataset();
-    chainBuilt=false;topoBuilt=false;
+    chainBuilt=false;rawBuilt=false;topoBuilt=false;
     destroyAllCharts();
     buildSelectors();
     renderCurrentPage();
@@ -930,25 +995,27 @@ function switchModel(modelName){
 }
 function switchVt(vt){
   const found=Object.keys(DATASETS).find(id=>DATASETS[id].model===ds().model&&DATASETS[id].vt===vt&&DATASETS[id].corner===ds().corner);
-  if(found){activeId=found;chainBuilt=false;topoBuilt=false;destroyAllCharts();buildSelectors();renderCurrentPage();}
+  if(found){activeId=found;chainBuilt=false;rawBuilt=false;topoBuilt=false;destroyAllCharts();buildSelectors();renderCurrentPage();}
 }
 function switchCorner(corner){
   const found=Object.keys(DATASETS).find(id=>DATASETS[id].model===ds().model&&DATASETS[id].vt===ds().vt&&DATASETS[id].corner===corner);
-  if(found){activeId=found;chainBuilt=false;topoBuilt=false;destroyAllCharts();buildSelectors();renderCurrentPage();}
+  if(found){activeId=found;chainBuilt=false;rawBuilt=false;topoBuilt=false;destroyAllCharts();buildSelectors();renderCurrentPage();}
 }
 function switchChainVdd(vdd){
   // find chain dataset with matching vdd
   const found=Object.keys(DATASETS).find(id=>DATASETS[id].model===ds().model&&DATASETS[id].vt===ds().vt&&DATASETS[id].chain_meta?.vdd===vdd);
-  if(found){activeId=found;chainBuilt=false;topoBuilt=false;destroyAllCharts();buildSelectors();renderCurrentPage();}
+  if(found){activeId=found;chainBuilt=false;rawBuilt=false;topoBuilt=false;destroyAllCharts();buildSelectors();renderCurrentPage();}
 }
 
 function destroyAllCharts(){
   [sweepObj,gainSweepObj,barObj,fomObj,tradeObj,trade2Obj,
    chainDelayObj,chainCeffObj,chainAcreffObj,chainIddqObj,
+   rawDelayObj,rawCeffObj,rawAcreffObj,rawIddqObj,
    corrBarDelay,corrBarCeff,corrBarAcreff,corrPctObj,corrScDelay,corrScCeff
   ].forEach(c=>{if(c)c.destroy();});
   sweepObj=gainSweepObj=barObj=fomObj=tradeObj=trade2Obj=null;
   chainDelayObj=chainCeffObj=chainAcreffObj=chainIddqObj=null;
+  rawDelayObj=rawCeffObj=rawAcreffObj=rawIddqObj=null;
   corrBarDelay=corrBarCeff=corrBarAcreff=corrPctObj=corrScDelay=corrScCeff=null;
 }
 
@@ -956,7 +1023,7 @@ function destroyAllCharts(){
 // PAGE SWITCHING
 // ═══════════════════════════════════════════════════════════════════
 function switchPage(val){
-  ['page-sweep','page-chain','page-topo'].forEach(id=>document.getElementById(id).style.display='none');
+  ['page-sweep','page-chain','page-raw','page-topo'].forEach(id=>document.getElementById(id).style.display='none');
   const chainVddGrp=document.getElementById('chain-vdd-group');
   chainVddGrp.style.display='none';
   if(val==='sweep'){
@@ -966,6 +1033,10 @@ function switchPage(val){
     document.getElementById('page-chain').style.display='';
     chainVddGrp.style.display=document.getElementById('chain-vdd-select').children.length>1?'':'none';
     renderChainPage();
+  } else if(val==='raw'){
+    document.getElementById('page-raw').style.display='';
+    chainVddGrp.style.display=document.getElementById('chain-vdd-select').children.length>1?'':'none';
+    renderRawPage();
   } else {
     document.getElementById('page-topo').style.display='';
     chainVddGrp.style.display=document.getElementById('chain-vdd-select').children.length>1?'':'none';
@@ -990,12 +1061,15 @@ function updateHeaderMeta(){
   let meta='';
   if(page==='sweep') meta=`${d.simulator} · ${d.model} · ${d.vt} · ${d.corner} Corner · T = ${d.temp} · VDD ${d.vdd_range} · ${d.cells.length} cells · 5 metrics`;
   else if(page==='chain') meta=`${d.chain_meta.simulator} · ${d.chain_meta.model} · ${d.chain_meta.vt} · ${d.chain_meta.corner} Corner · T = ${d.chain_meta.temp} · VDD = ${d.chain_meta.vdd} · ${d.chain_cells?.length||0} cells`;
+  else if(page==='raw') meta=`${d.chain_meta.simulator} · ${d.chain_meta.model} · ${d.chain_meta.vt} · ${d.chain_meta.corner} Corner · T = ${d.chain_meta.temp} · VDD = ${d.chain_meta.vdd} · ${d.chain_cells?.length||0} cells · raw undivided`;
   else meta=`${d.model} ${d.vt} · Single Stage (VDD=${VDD()[vddIdx]}V) vs Chain Per-Stage (VDD=${d.chain_meta.vdd}) · ${d.corner} · T = ${d.temp}`;
   document.getElementById('header-meta').textContent=meta;
   const badges=page==='sweep'
     ?`<span class="badge">${d.cells.length} cells</span><span class="badge">${d.tsl_order.join(' / ')}</span><span class="badge">VDD ${d.vdd_range} (${d.vdd.length} pts)</span><span class="badge">${d.vt}</span><span class="badge">${d.corner} · ${d.temp}</span><span class="badge">${d.model}</span>`
     :page==='chain'
     ?`<span class="badge">${d.chain_cells?.length||0} cells</span><span class="badge">${d.chain_meta.vt}</span><span class="badge">${d.chain_meta.stages}-stage chain</span><span class="badge">VDD = ${d.chain_meta.vdd}</span><span class="badge">${d.chain_meta.corner} · ${d.chain_meta.temp}</span><span class="badge">${d.chain_meta.model}</span>`
+    :page==='raw'
+    ?`<span class="badge">${d.chain_cells?.length||0} cells</span><span class="badge">${d.chain_meta.vt}</span><span class="badge">${d.chain_meta.stages}-stage chain</span><span class="badge">VDD = ${d.chain_meta.vdd}</span><span class="badge badge-raw" style="border-color:#ffe93e;color:#ffe93e">RAW · ×${d.chain_meta.stages}</span><span class="badge">${d.chain_meta.model}</span>`
     :`<span class="badge" style="border-color:#00d4ff;color:#00d4ff">Single Stage · ${d.model}</span><span class="badge" style="border-color:#ff6b35;color:#ff6b35">Chain Per-Stage · ${d.chain_meta.model}</span><span class="badge">VDD = ${d.chain_meta.vdd}</span><span class="badge">${d.corner} · ${d.temp}</span>`;
   document.getElementById('header-badges').innerHTML=badges;
 }
@@ -1495,6 +1569,81 @@ function renderChainPage(){
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// PAGE ③ — RAW CHAIN TOTALS RENDERER
+// Mirrors renderChainPage() but multiplies all per-stage values by
+// the number of stages to produce undivided ring totals.
+// Works for any dataset that has chain_cells + chain_meta.stages.
+// ═══════════════════════════════════════════════════════════════════
+function renderRawPage(){
+  updateHeaderMeta();
+  if(rawBuilt)return;
+  rawBuilt=true;
+  const d=ds();const cm=d.chain_meta;const cc=d.chain_cells||[];
+  const N=cm.stages||101;
+  if(!cc.length)return;
+
+  document.getElementById('raw-section-title').textContent=`${N}-Stage Chain — Raw (Undivided) Totals (${cm.vt})`;
+  document.getElementById('raw-chart-title').textContent=`Raw Chain Totals — ${cm.vt} · VDD = ${cm.vdd}`;
+  document.getElementById('raw-conditions').textContent=`${cm.simulator} · ${cm.model} · ${cm.vt} · ${cm.corner} · T = ${cm.temp} · VDD = ${cm.vdd} · ${N} stages · values = per-stage × ${N}`;
+  document.getElementById('raw-infobox-stages').textContent=`Raw values — NOT divided by STAGES=${N}.`;
+  document.getElementById('raw-infobox-formula-delay').textContent=`total_half_period = stage_delay × ${N}`;
+  document.getElementById('raw-infobox-formula-freq').textContent=`f = 1 ÷ (2 × total_half_period [ps] × 1e-12)`;
+
+  // Scale each cell's per-stage values to ring totals
+  const raw=cc.map(c=>({
+    label:   c.label,
+    delay:   c.stage_delay * N,   // total half-period, ps
+    ceff:    c.ceff    * N,       // total effective capacitance
+    acreff:  c.acreff  * N,       // total effective resistance
+    iddq:    c.iddq    * N,       // total ring IDDQ
+  }));
+
+  // Table
+  const maxD=Math.max(...raw.map(r=>r.delay));
+  document.getElementById('raw-tbody').innerHTML=raw.map((r,i)=>{
+    const freq=1/(2*r.delay*1e-12)/1e9;
+    return`<tr>
+      <td><span class="chip chip7">${r.label}</span></td>
+      <td><div style="display:flex;align-items:center;gap:8px">
+        <span class="mono">${r.delay.toFixed(3)}</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${(r.delay/maxD*100).toFixed(1)}%;background:${CHAIN_COLORS[i]}"></div></div>
+      </div></td>
+      <td class="mono">${r.ceff.toFixed(3)}</td>
+      <td class="mono">${r.acreff.toFixed(3)}</td>
+      <td class="mono">${r.iddq.toFixed(3)}</td>
+      <td class="mono" style="color:var(--accent)">${freq.toFixed(3)}</td>
+    </tr>`;}).join('');
+
+  // Charts
+  const labels=raw.map(r=>r.label);const colors=CHAIN_COLORS;
+  const sub=`${cm.vt} · VDD = ${cm.vdd} · ${N} stages · raw × ${N} · ${cm.model}`;
+  ['delay','ceff','acreff','iddq'].forEach(k=>document.getElementById('raw-sub-'+k).textContent=sub);
+
+  rawDelayObj=new Chart(document.getElementById('raw-delay'),{type:'bar',
+    data:{labels,datasets:[{label:`Total Half-Period (ps)`,data:raw.map(r=>r.delay),backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:3}]},
+    options:chainBarOpts('Total Half-Period (ps)',v=>v.toFixed(3)+' ps')});
+  rawCeffObj=new Chart(document.getElementById('raw-ceff'),{type:'bar',
+    data:{labels,datasets:[{label:`Ceff × ${N} (fF)`,data:raw.map(r=>r.ceff),backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:3}]},
+    options:chainBarOpts(`Ceff × ${N} (fF)`,v=>v.toFixed(3)+' fF')});
+  rawAcreffObj=new Chart(document.getElementById('raw-acreff'),{type:'bar',
+    data:{labels,datasets:[{label:`ACReff × ${N} (KΩ)`,data:raw.map(r=>r.acreff),backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:3}]},
+    options:chainBarOpts(`ACReff × ${N} (KΩ)`,v=>v.toFixed(3)+' KΩ')});
+  rawIddqObj=new Chart(document.getElementById('raw-iddq'),{type:'bar',
+    data:{labels,datasets:[{label:`IDDQ total (nA)`,data:raw.map(r=>r.iddq),backgroundColor:colors.map(c=>c+'bb'),borderColor:colors,borderWidth:2,borderRadius:3}]},
+    options:chainBarOpts('IDDQ total (nA)',v=>v.toFixed(3)+' nA')});
+
+  // Takeaways
+  const sorted=[...raw].sort((a,b)=>a.delay-b.delay);
+  const fastest=sorted[0],slowest=sorted[sorted.length-1];
+  const freqFast=(1/(2*fastest.delay*1e-12)/1e9).toFixed(3);
+  const freqSlow=(1/(2*slowest.delay*1e-12)/1e9).toFixed(3);
+  document.getElementById('raw-takeaway-list').innerHTML=`
+    <li><strong>${fastest.label} has the shortest total half-period</strong> at ${fastest.delay.toFixed(1)} ps (ring freq = ${freqFast} GHz). ${slowest.label} is the slowest at ${slowest.delay.toFixed(1)} ps (${freqSlow} GHz) — a ${(slowest.delay/fastest.delay).toFixed(2)}× ratio.</li>
+    <li><strong>All values are raw ring totals (× ${N}).</strong> Divide by ${N} to recover per-stage quantities. Per-stage values are shown on Page ②.</li>
+    <li><strong>Ring frequency</strong> is computed directly from the total half-period: f = 1 ÷ (2 × T_half [ps] × 10⁻¹²).</li>`;
+}
+
+
 // PAGE ③ — TOPOLOGY COMPARISON RENDERER
 // ═══════════════════════════════════════════════════════════════════
 // Map chain cell suffix → single-stage cell type
