@@ -231,3 +231,34 @@ git push --force "https://${TOKEN}@github.com/Imran-younus/ppg-results.git" main
 
 **Staging rule:** never `git add .` — explicitly name each file to avoid
 committing hundreds of per-cell `run_vdd/` netlists.
+
+---
+
+## 10. Unified Simulation Workflow & Coding Guidelines
+
+### Unified Architecture (`run_ppg_sim.sh`)
+All standard cell simulations across any model version are driven by the unified, model-agnostic entrypoint `run_ppg_sim.sh` backed by `ppg_sim_lib.sh`:
+
+1. **Parameters & Overrides:**
+   - `MODEL_NAME` (required): short model label (e.g. `v0.6SB`, `v0.6SB2`, `v0.22`)
+   - `MODEL_INC` (required): path to `design_include.inc`
+   - `MODEL_LIB` (required): path to `fixed_corner.lib` (must match sandbox of `MODEL_INC`)
+   - `VDD` (optional): `sweep` (default 14 voltages: 0.5V to 1.15V) or single point (`0.70`) or custom list
+   - `TEMP` (optional): simulation temperature in °C (default: `25`)
+   - `VT` (optional): `slvt` (default, preserves SLVT device names) or `ulvt` (converts slvt→ulvt)
+   - `SPFDIR` (optional): override default SPF directory
+   - `OUTPUT` (optional): custom output results path
+
+2. **Execution Flow:**
+   - Validates model paths (`validate_model_params`)
+   - Generates per-voltage templates and per-cell netlists (`patch_netlist`)
+   - Normalises SPF pin order to `VSS VDD A Z` (`process_spf_slvt` / `process_spf`)
+   - Emits standalone `run_hsp.sh` wrappers containing verified license strings (`create_hsp_wrapper`)
+   - Dispatches parallel LSF jobs and monitors queue (`wait_for_jobs`)
+   - Extracts metrics into tab-separated results file (`stage_delay`, `iddq`, `iddarail_qcorr`, `acceffrail_qcorr`, `acreffrail_qcorr`)
+
+3. **Coding Standards for Future Scripts:**
+   - **POSIX ksh:** Never use `local` keyword; use prefixed globals (`_vm_*`, `_pn_*`, `_ps_*`, `_cw_*`, `_wj_*`).
+   - **Concise Comments:** Add brief, actionable comments explaining interface and non-obvious steps.
+   - **Zero Hardcoded Paths in Libs:** Keep model paths in environment variables or caller scripts.
+   - **Automated Validation:** Always run `verify_dataset_consistency.js` before staging and pushing.

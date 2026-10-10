@@ -1,0 +1,86 @@
+#!/bin/ksh
+#=============================================================================
+# PPGRO_DUT_7TINVNANDNOR_menu_sweep_v0p6SB2_slvt
+# Purpose : Run HSPICE 101-stage RO simulations for 7 SLVT cell types in
+#           parallel using LSF.
+#
+# Accepts:
+#   MODEL_NAME — model label (e.g. v0.6SB, v0.6SB2)
+#   MODEL_INC  — path to design_include.inc
+#   MODEL_LIB  — path to fixed_corner.lib
+#   VDD        — supply voltage (default: 0.70)
+#   TEMP       — simulation temperature in °C (default: 25)
+#=============================================================================
+
+SCRIPTDIR='/afs/apd.pok.ibm.com/u/imranyou/for_imran'
+FULLDUTDIR="$SCRIPTDIR/full_dut"
+. "$SCRIPTDIR/ppg_sim_lib.sh"
+
+validate_model_params
+
+BASESP="$FULLDUTDIR/PPG_ROM_cronus_base_v0p6SB2.sp"
+RUNBASE="$FULLDUTDIR/run"
+RESULTS="$FULLDUTDIR/PPRGO_menu.txt"
+NETLIST='invfo3_mod.sp'
+LSF_JOBPREFIX='PPGdut'
+VDD="${VDD:-0.70}"
+TEMP="${TEMP:-25}"
+
+mkdir -p "$RUNBASE"
+
+# 7 SLVT 101-stage chain cells: "label  spf_path  subckt_name"
+CELLS="
+7TSL_INVX2  /gpfs/projects/t/titan/pdk/models/upl/2hp/cronus_dd1/PPG_RO_A1_Ref_C45_FO3/netlists/v0.6.SB/A1_8_ref_INV_X2_45_7T_FO3_SLVT.spf     A01_D08_PPG_DUT
+7TSL_NAND2B /gpfs/projects/t/titan/pdk/models/upl/2hp/cronus_dd1/PPG_RO_A13_PPG_Suite/netlists/v0.6.SB/A13_7_PPGSuite_NAND2_X1_B_45_7T_FO3_SLVT.spf  A13_D07_PPG_DUT
+7TSL_NAND2T /gpfs/projects/t/titan/pdk/models/upl/2hp/cronus_dd1/PPG_RO_A13_PPG_Suite/netlists/v0.6.SB/A13_8_PPGSuite_NAND2_X1_T_45_7T_FO3_SLVT.spf  A13_D08_PPG_DUT
+7TSL_NAND3B /gpfs/projects/t/titan/pdk/models/upl/2hp/cronus_dd1/PPG_RO_A13_PPG_Suite/netlists/v0.6.SB/A13_9_PPGSuite_NAND3_X1_B_45_7T_FO3_SLVT.spf  A13_D09_PPG_DUT
+7TSL_NAND3T /gpfs/projects/t/titan/pdk/models/upl/2hp/cronus_dd1/PPG_RO_A13_PPG_Suite/netlists/v0.6.SB/A13_10_PPGSuite_NAND3_X1_T_45_7T_FO3_SLVT.spf A13_D10_PPG_DUT
+7TSL_NOR2B  /gpfs/projects/t/titan/pdk/models/upl/2hp/cronus_dd1/PPG_RO_A13_PPG_Suite/netlists/v0.6.SB/A13_11_PPGSuite_NOR2_X1_B_45_7T_FO3_SLVT.spf  A13_D11_PPG_DUT
+7TSL_NOR2T  /gpfs/projects/t/titan/pdk/models/upl/2hp/cronus_dd1/PPG_RO_A13_PPG_Suite/netlists/v0.6.SB/A13_12_PPGSuite_NOR2_X1_T_45_7T_FO3_SLVT.spf  A13_D12_PPG_DUT
+"
+
+echo "Submitting 101-stage RO simulations: Model=$MODEL_NAME, VDD=${VDD}V, TEMP=${TEMP}C"
+
+echo "$CELLS" | while read label spf subckt; do
+    [ -z "$label" ] && continue
+    rundir="$RUNBASE/$label"
+    mkdir -p "$rundir"
+
+    # Clean previous run artifacts
+    rm -f "$rundir/$NETLIST.lis" "$rundir/invfo3_mod_dp.lis"
+
+    # Inject model, SPF, subckt, VDD, and TEMP
+    patch_netlist "$BASESP" "$rundir/$NETLIST" "$spf" "$subckt" "$VDD" "$TEMP"
+
+    # Generate wrapper with license
+    create_hsp_wrapper "$rundir/run_hsp.sh" "$rundir/$NETLIST"
+
+    # Submit LSF job
+    bsub -J "${LSF_JOBPREFIX}_${label}" \
+         -M 128 -n 8 -W 4:00 \
+         -R "select[ $DEFAULT_LSF_SELECT ]" \
+         -cwd "$rundir" \
+         "ksh $rundir/run_hsp.sh" > /dev/null 2>&1
+done
+
+# Wait for completion
+wait_for_jobs "$LSF_JOBPREFIX"
+
+# Collect results
+printf "" > "$RESULTS"
+echo "Collecting results -> $RESULTS"
+
+echo "$CELLS" | while read label spf subckt; do
+    [ -z "$label" ] && continue
+    lisfile="$RUNBASE/$label/$NETLIST.lis"
+    printf "%s\n" "$label"       >> "$RESULTS"
+    grep power_supply "$lisfile" >> "$RESULTS"
+    grep temp         "$lisfile" >> "$RESULTS"
+    grep stage_delay= "$lisfile" >> "$RESULTS"
+    grep " ceff="     "$lisfile" >> "$RESULTS"
+    grep " acreff="   "$lisfile" >> "$RESULTS"
+    grep iddq_stage=  "$lisfile" >> "$RESULTS"
+done
+
+echo ""
+echo "Done. Model: $MODEL_NAME, Results: $RESULTS"
