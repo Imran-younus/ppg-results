@@ -842,19 +842,22 @@ const CHAIN_COLORS=['#00d4ff','#00ff9f','#ffe93e','#ff6b35','#ff2d78','#bd00ff',
 const METRICS_LABEL={stage_delay:'Stage Delay (ps)',iddq:'IDDQ (nA)',iddarail:'IDDArail (μA)',acceff:'ACCeff (fF)',acreff:'ACReff (Ω)'};
 const METRICS_SCALE={stage_delay:1,iddq:1e9,iddarail:1e6,acceff:1e15,acreff:1};
 const METRICS_FMT={
-  stage_delay:v=>v.toFixed(3)+' ps',
-  iddq:v=>v.toFixed(3)+' nA',
-  iddarail:v=>v.toFixed(3)+' μA',
-  acceff:v=>v.toFixed(3)+' fF',
-  acreff:v=>v.toFixed(1)+' Ω'
+  stage_delay:v=>(v*METRICS_SCALE.stage_delay).toFixed(3)+' ps',
+  iddq:v=>(v*METRICS_SCALE.iddq).toFixed(3)+' nA',
+  iddarail:v=>(Math.abs(v*METRICS_SCALE.iddarail)>=100?(v*METRICS_SCALE.iddarail).toFixed(2):(v*METRICS_SCALE.iddarail).toFixed(3))+' μA',
+  acceff:v=>(v*METRICS_SCALE.acceff).toFixed(3)+' fF',
+  acreff:v=>(v*METRICS_SCALE.acreff).toFixed(1)+' Ω'
 };
 function fmtVal(v,m){
   if(v==null||isNaN(v))return '—';
   const s=METRICS_SCALE[m]||1;
   const sv=v*s;
   if(m==='stage_delay') return sv.toFixed(3);
+  if(m==='iddq') return sv.toFixed(3);
+  if(m==='iddarail') return Math.abs(sv)>=100?sv.toFixed(2):sv.toFixed(3);
+  if(m==='acceff') return sv.toFixed(3);
   if(m==='acreff') return sv.toFixed(1);
-  return sv.toExponential(3);
+  return Math.abs(sv)<0.01||Math.abs(sv)>=10000?sv.toExponential(3):sv.toFixed(3);
 }
 
 // ── State ──────────────────────────────────────────────────────────
