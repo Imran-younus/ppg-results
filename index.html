@@ -125,8 +125,8 @@ footer{border-top:1px solid var(--border);margin-top:40px;padding-top:12px;text-
     <label>Page</label>
     <select id="page-select" onchange="switchPage(this.value)">
       <option value="sweep">① Single Stage — VDD Sweep</option>
-      <option value="chain">② Chain — Per-Stage Values</option>
-      <option value="raw">③ Chain — Raw (Undivided) Totals</option>
+      <option value="raw">② Chain — Raw (Undivided) Totals</option>
+      <option value="chain">③ Chain — Per-Stage Values</option>
       <option value="topo">④ Single Stage vs Chain Comparison</option>
     </select>
   </div>
@@ -270,7 +270,7 @@ footer{border-top:1px solid var(--border);margin-top:40px;padding-top:12px;text-
 <!-- ═══════════════════════════════════════════════════════ -->
 <div id="page-chain" style="display:none">
 <section>
-  <div class="section-title"><span class="bar"></span><span id="chain-section-title">101-Stage Chain — Per-Stage Values</span><span class="pg">②</span></div>
+  <div class="section-title"><span class="bar"></span><span id="chain-section-title">101-Stage Chain — Per-Stage Values</span><span class="pg">③</span></div>
   <div class="info-box info">
     <strong style="color:var(--accent2)">ℹ <span id="chain-infobox-stages">HSPICE .measure divides by STAGES internally.</span></strong>
     Values below are already per-stage and directly comparable to single-stage simulation results.
@@ -357,7 +357,7 @@ footer{border-top:1px solid var(--border);margin-top:40px;padding-top:12px;text-
 <!-- ═══════════════════════════════════════════════════════ -->
 <div id="page-raw" style="display:none">
 <section>
-  <div class="section-title"><span class="bar"></span><span id="raw-section-title">101-Stage Chain — Raw (Undivided) Totals</span><span class="pg">③</span></div>
+  <div class="section-title"><span class="bar"></span><span id="raw-section-title">101-Stage Chain — Raw (Undivided) Totals</span><span class="pg">②</span></div>
   <div class="info-box info">
     <strong style="color:var(--accent2)">ℹ <span id="raw-infobox-stages">Raw values — NOT divided by STAGES.</span></strong>
     Values below are the <em>total</em> ring quantities before per-stage normalisation.
@@ -1639,7 +1639,7 @@ function renderRawPage(){
   const freqSlow=(1/(2*slowest.delay*1e-12)/1e9).toFixed(3);
   document.getElementById('raw-takeaway-list').innerHTML=`
     <li><strong>${fastest.label} has the shortest total half-period</strong> at ${fastest.delay.toFixed(1)} ps (ring freq = ${freqFast} GHz). ${slowest.label} is the slowest at ${slowest.delay.toFixed(1)} ps (${freqSlow} GHz) — a ${(slowest.delay/fastest.delay).toFixed(2)}× ratio.</li>
-    <li><strong>All values are raw ring totals (× ${N}).</strong> Divide by ${N} to recover per-stage quantities. Per-stage values are shown on Page ②.</li>
+    <li><strong>All values are raw ring totals (× ${N}).</strong> Divide by ${N} to recover per-stage quantities. Per-stage values are shown on Page ③.</li>
     <li><strong>Ring frequency</strong> is computed directly from the total half-period: f = 1 ÷ (2 × T_half [ps] × 10⁻¹²).</li>`;
 }
 
