@@ -463,9 +463,9 @@ footer{border-top:1px solid var(--border);margin-top:40px;padding-top:12px;text-
 <div id="page-cmp" style="display:none">
 
 <section>
-  <div class="section-title"><span class="bar"></span>Model Comparison — Metric at Selected VDD<span class="pg">④</span></div>
+  <div class="section-title"><span class="bar"></span>All Models · Single-Stage Metrics at Selected VDD<span class="pg">④</span></div>
   <div class="controls" id="cmp-controls">
-    <label>Metric:</label>
+    <label>Metrics:</label>
     <span id="cmp-metric-row" style="display:inline-flex;flex-wrap:wrap;gap:4px"></span>
     <div class="sep"></div>
     <label>VDD:</label>
@@ -477,18 +477,29 @@ footer{border-top:1px solid var(--border);margin-top:40px;padding-top:12px;text-
     <label>Cell:</label>
     <span id="cmp-cell-row" style="display:inline-flex;flex-wrap:wrap;gap:4px"></span>
   </div>
-  <div class="chart-card wide"><canvas id="cmpBarChart" height="90"></canvas></div>
-</section>
-
-<section>
-  <div class="section-title"><span class="bar"></span>Δ% vs Baseline Model</div>
-  <div class="info-box" id="cmp-baseline-label"></div>
-  <div class="chart-card wide"><canvas id="cmpDeltaChart" height="75"></canvas></div>
+  <!-- Per-metric chart+delta pairs rendered here dynamically -->
+  <div id="cmp-metric-charts"></div>
 </section>
 
 <section>
   <div class="section-title"><span class="bar"></span>Cross-Model Data Table</div>
+  <div class="controls" style="margin-bottom:6px">
+    <label>Table metric:</label>
+    <span id="cmp-table-metric-row" style="display:inline-flex;flex-wrap:wrap;gap:4px"></span>
+  </div>
   <div class="table-wrap"><table id="cmp-table"><thead id="cmp-thead"></thead><tbody id="cmp-tbody"></tbody></table></div>
+</section>
+
+<!-- Chain comparison section — shown only when ≥2 models have chain_cells -->
+<section id="cmp-chain-section" style="display:none">
+  <div class="section-title"><span class="bar"></span>All Models · 101-Stage Chain Per-Stage Comparison</div>
+  <div class="info-box" id="cmp-chain-info"></div>
+  <div class="controls" id="cmp-chain-controls">
+    <label>Chain metric:</label>
+    <span id="cmp-chain-metric-row" style="display:inline-flex;flex-wrap:wrap;gap:4px"></span>
+  </div>
+  <div id="cmp-chain-charts"></div>
+  <div class="table-wrap" style="margin-top:12px"><table id="cmp-chain-table"><thead id="cmp-chain-thead"></thead><tbody id="cmp-chain-tbody"></tbody></table></div>
 </section>
 
 <section>
@@ -502,7 +513,7 @@ footer{border-top:1px solid var(--border);margin-top:40px;padding-top:12px;text-
 
 </div><!-- end #page-cmp -->
 
-<footer>PPG Delay Chain Simulation Results &nbsp;·&nbsp; Made with IBM Bob &nbsp;·&nbsp; <span id="site-version">v2025-07-b03f384 · 3 models · ①②③④</span></footer>
+<footer>PPG Delay Chain Simulation Results &nbsp;·&nbsp; Made with IBM Bob &nbsp;·&nbsp; <span id="site-version">v2025-07-cmp-v2 · 3 models · ①②③④ · multi-metric + chain cmp</span></footer>
 </div><!-- end .page -->
 
 <script>
@@ -1062,12 +1073,14 @@ let sweepObj=null,gainSweepObj=null,barObj=null,fomObj=null,
     chainDelayObj=null,chainCeffObj=null,chainAcreffObj=null,chainIddqObj=null,
     corrBarDelay=null,corrBarCeff=null,corrBarAcreff=null,corrPctObj=null,
     corrScDelay=null,corrScCeff=null;
-let cmpBarObj=null,cmpDeltaObj=null;
+let cmpBarObjs=[],cmpDeltaObjs=[],cmpChainObjs=[];
 let chainBuilt=false,topoBuilt=false,cmpBuilt=false;
 
 // ── Model Comparison state ──────────────────────────────────────────
-let cmpMetric='stage_delay';
+const cmpMetrics=new Set(['stage_delay']); // multi-select
 let cmpVddIdx=4;
+let cmpTableMetric='stage_delay';
+let cmpChainMetric='stage_delay';
 const CMP_TSL_SHOW={};   // tsl  → bool
 const CMP_CELL_SHOW={};  // type → bool
 
@@ -1079,9 +1092,11 @@ function buildSelectors(){
   const models=[...new Set(ids.map(id=>DATASETS[id].model))];
   const activeDs=ds();
 
-  // Model selector
+  // Model selector — hidden on cmp page (cmp compares ALL models simultaneously)
   const mSel=document.getElementById('model-select');
   mSel.innerHTML=models.map(m=>`<option value="${m}"${m===activeDs.model?' selected':''}>${DATASETS[ids.find(id=>DATASETS[id].model===m)].name}</option>`).join('');
+  document.querySelector('.sel-group:has(#model-select)').style.display=
+    document.getElementById('page-select').value==='cmp'?'none':'';
 
   // Vt selector — show only if >1 vt for active model
   const vts=[...new Set(ids.filter(id=>DATASETS[id].model===activeDs.model).map(id=>DATASETS[id].vt))];
@@ -1147,12 +1162,12 @@ function destroyAllCharts(){
   [sweepObj,gainSweepObj,barObj,fomObj,tradeObj,trade2Obj,
    chainDelayObj,chainCeffObj,chainAcreffObj,chainIddqObj,
    corrBarDelay,corrBarCeff,corrBarAcreff,corrPctObj,corrScDelay,corrScCeff,
-   cmpBarObj,cmpDeltaObj
+   ...cmpBarObjs,...cmpDeltaObjs,...cmpChainObjs
   ].forEach(c=>{if(c)c.destroy();});
   sweepObj=gainSweepObj=barObj=fomObj=tradeObj=trade2Obj=null;
   chainDelayObj=chainCeffObj=chainAcreffObj=chainIddqObj=null;
   corrBarDelay=corrBarCeff=corrBarAcreff=corrPctObj=corrScDelay=corrScCeff=null;
-  cmpBarObj=cmpDeltaObj=null;
+  cmpBarObjs=[];cmpDeltaObjs=[];cmpChainObjs=[];
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1197,12 +1212,17 @@ function renderCurrentPage(){
 function updateHeaderMeta(){
   const d=ds();
   const cm=d.chain_meta||{};
-  document.getElementById('page-title').textContent=`PPG Delay Chain — ${d.model} ${d.vt} Results`;
   const page=document.getElementById('page-select').value;
+  if(page==='cmp'){
+    const allM=cmpGetModels();
+    document.getElementById('page-title').textContent=`PPG Delay Chain — Model Comparison (${allM.length} models)`;
+  } else {
+    document.getElementById('page-title').textContent=`PPG Delay Chain — ${d.model} ${d.vt} Results`;
+  }
   let meta='';
   if(page==='sweep') meta=`${d.simulator} · ${d.model} · ${d.vt} · ${d.corner} Corner · T = ${d.temp} · VDD ${d.vdd_range} · ${d.cells.length} cells · 5 metrics`;
   else if(page==='chain') meta=`${cm.simulator||d.simulator} · ${cm.model||d.model} · ${cm.vt||d.vt} · ${cm.corner||d.corner} Corner · T = ${cm.temp||d.temp} · VDD = ${cm.vdd||'—'} · ${d.chain_cells?.length||0} cells`;
-  else if(page==='cmp'){const allM=cmpGetModels();meta=`Cross-model comparison · ${allM.length} models · ${METRICS_LABEL[cmpMetric]} · VDD=${cmpGetVddList()[cmpVddIdx]||'?'}V`;}
+  else if(page==='cmp'){const allM=cmpGetModels();const selM=[...cmpMetrics];meta=`Cross-model comparison · ${allM.length} models · ${selM.map(m=>METRICS_LABEL[m]).join(', ')} · VDD=${cmpGetVddList()[cmpVddIdx]||'?'}V`;}
   else meta=`${d.model} ${d.vt} · Single Stage (VDD=${VDD()[vddIdx]}V) vs Chain Per-Stage (VDD=${cm.vdd||'—'}) · ${d.corner} · T = ${d.temp}`;
   document.getElementById('header-meta').textContent=meta;
   const badges=page==='sweep'
@@ -1210,7 +1230,7 @@ function updateHeaderMeta(){
     :page==='chain'
     ?`<span class="badge">${d.chain_cells?.length||0} cells</span><span class="badge">${cm.vt||d.vt}</span><span class="badge">${cm.stages||'?'}-stage chain</span><span class="badge">VDD = ${cm.vdd||'—'}</span><span class="badge">${cm.corner||d.corner} · ${cm.temp||d.temp}</span><span class="badge">${cm.model||d.model}</span>`
     :page==='cmp'
-    ?cmpGetModels().map((m,i)=>`<span class="badge" style="border-color:${cmpModelColor(i)};color:${cmpModelColor(i)}">${m.name}</span>`).join('')+`<span class="badge">VDD=${cmpGetVddList()[cmpVddIdx]||'?'}V</span><span class="badge">${METRICS_LABEL[cmpMetric]}</span>`
+    ?cmpGetModels().map((m,i)=>`<span class="badge" style="border-color:${cmpModelColor(i)};color:${cmpModelColor(i)}">${m.name}</span>`).join('')+`<span class="badge">VDD=${cmpGetVddList()[cmpVddIdx]||'?'}V</span>`+[...cmpMetrics].map(m=>`<span class="badge">${METRICS_LABEL[m]}</span>`).join('')
     :`<span class="badge" style="border-color:#00d4ff;color:#00d4ff">Single Stage · ${d.model}</span><span class="badge" style="border-color:#ff6b35;color:#ff6b35">Chain Per-Stage · ${cm.model||d.model}</span><span class="badge">VDD = ${cm.vdd||'—'}</span><span class="badge">${d.corner} · ${d.temp}</span>`;
   document.getElementById('header-badges').innerHTML=badges;
 }
@@ -1881,55 +1901,34 @@ function renderTopoPage(){
 // ═══════════════════════════════════════════════════════════════════
 // MODEL COMPARISON
 // ═══════════════════════════════════════════════════════════════════
+// MODEL COMPARISON PAGE
+// ═══════════════════════════════════════════════════════════════════
 
 // Palette: one distinct color per model slot (auto-extends)
 const CMP_MODEL_PALETTE=['#00d4ff','#ff6b35','#00ff9f','#ffe93e','#ff2d78','#bd00ff','#3ee8ff','#ff9500'];
 function cmpModelColor(idx){ return CMP_MODEL_PALETTE[idx%CMP_MODEL_PALETTE.length]; }
 
-// Returns one representative dataset per unique model name (prefer SLVT TT)
+// Returns one representative dataset per unique model name (insertion order)
 function cmpGetModels(){
   const seen=new Set();
   const out=[];
   Object.values(DATASETS).forEach(d=>{
-    if(!seen.has(d.model)){
-      seen.add(d.model);
-      out.push(d);
-    }
+    if(!seen.has(d.model)){seen.add(d.model);out.push(d);}
   });
-  // Sort: chronological by order they appear in DATASETS (registration order)
   return out;
 }
 
-// Returns the union of all VDD arrays (assume common across datasets)
-function cmpGetVddList(){
-  const models=cmpGetModels();
-  return models[0]?.vdd||[];
-}
+function cmpGetVddList(){ return cmpGetModels()[0]?.vdd||[]; }
+function cmpGetAllCells(){ const s=new Set();cmpGetModels().forEach(d=>d.cells.forEach(c=>s.add(c)));return[...s]; }
+function cmpGetAllTsls(){ const s=new Set();cmpGetModels().forEach(d=>(d.tsl_order||[...new Set(d.cells.map(c=>c.slice(0,4)))]).forEach(t=>s.add(t)));return[...s]; }
+function cmpGetAllCellTypes(){ const s=new Set();cmpGetModels().forEach(d=>d.cells.forEach(c=>s.add(c.slice(5))));return[...s]; }
+function cmpGetChainModels(){ return cmpGetModels().filter(d=>d.chain_cells&&d.chain_cells.length>0); }
+function cmpGetAllChainCells(){ const s=new Set();cmpGetChainModels().forEach(d=>d.chain_cells.forEach(c=>s.add(c)));return[...s]; }
 
-// Returns union of all cell names across all model datasets
-function cmpGetAllCells(){
-  const cells=new Set();
-  cmpGetModels().forEach(d=>d.cells.forEach(c=>cells.add(c)));
-  return [...cells];
-}
-
-// Returns union of all TSL tiers across all model datasets
-function cmpGetAllTsls(){
-  const tsls=new Set();
-  cmpGetModels().forEach(d=>(d.tsl_order||[...new Set(d.cells.map(c=>c.slice(0,4)))]).forEach(t=>tsls.add(t)));
-  return [...tsls];
-}
-
-// Returns union of all cell types (suffixes) across all model datasets
-function cmpGetAllCellTypes(){
-  const types=new Set();
-  cmpGetModels().forEach(d=>d.cells.forEach(c=>types.add(c.slice(5))));
-  return [...types];
-}
-
-function setCmpMetric(m){
-  cmpMetric=m;
-  document.querySelectorAll('[data-cmp-m]').forEach(b=>b.classList.toggle('active',b.dataset.cmpM===m));
+function toggleCmpMetric(m){
+  if(cmpMetrics.has(m)&&cmpMetrics.size>1) cmpMetrics.delete(m);
+  else cmpMetrics.add(m);
+  document.querySelectorAll('[data-cmp-m]').forEach(b=>b.classList.toggle('active',cmpMetrics.has(b.dataset.cmpM)));
   cmpRenderCharts();
   updateHeaderMeta();
 }
@@ -1949,35 +1948,41 @@ function toggleCmpCell(ct){
   document.getElementById('cmp-cell-'+ct)?.classList.toggle('active',CMP_CELL_SHOW[ct]);
   cmpRenderCharts();
 }
+function setCmpTableMetric(m){
+  cmpTableMetric=m;
+  document.querySelectorAll('[data-cmp-tm]').forEach(b=>b.classList.toggle('active',b.dataset.cmpTm===m));
+  cmpRenderTable();
+}
+function setCmpChainMetric(m){
+  cmpChainMetric=m;
+  document.querySelectorAll('[data-cmp-cm]').forEach(b=>b.classList.toggle('active',b.dataset.cmpCm===m));
+  cmpRenderChainSection();
+}
 
 function renderCmpPage(){
   const models=cmpGetModels();
   const vddList=cmpGetVddList();
-  const allCells=cmpGetAllCells();
   const allTsls=cmpGetAllTsls();
   const allTypes=cmpGetAllCellTypes();
 
-  // Clamp cmpVddIdx
   if(cmpVddIdx>=vddList.length) cmpVddIdx=Math.min(4,vddList.length-1);
-
-  // Initialise filter state once
   allTsls.forEach(t=>{ if(CMP_TSL_SHOW[t]==null) CMP_TSL_SHOW[t]=true; });
   allTypes.forEach(t=>{ if(CMP_CELL_SHOW[t]==null) CMP_CELL_SHOW[t]=true; });
 
-  // ── Build metric selector ──────────────────────────────────────
+  // ── Metric multi-select (rebuild each time) ────────────────────
   const mRow=document.getElementById('cmp-metric-row');
-  if(!mRow.children.length){
-    Object.keys(METRICS_LABEL).forEach(m=>{
-      const b=document.createElement('button');
-      b.className='btn'+(m===cmpMetric?' active':'');
-      b.dataset.cmpM=m;
-      b.textContent=METRICS_LABEL[m];
-      b.onclick=()=>setCmpMetric(m);
-      mRow.appendChild(b);
-    });
-  }
+  mRow.innerHTML='';
+  Object.keys(METRICS_LABEL).forEach(m=>{
+    const b=document.createElement('button');
+    b.className='btn'+(cmpMetrics.has(m)?' active':'');
+    b.dataset.cmpM=m;
+    b.textContent=METRICS_LABEL[m];
+    b.title='Click to toggle this metric on/off in the charts';
+    b.onclick=()=>toggleCmpMetric(m);
+    mRow.appendChild(b);
+  });
 
-  // ── Build VDD pill row ─────────────────────────────────────────
+  // ── VDD pill row ───────────────────────────────────────────────
   const vRow=document.getElementById('cmp-vdd-row');
   vRow.innerHTML='';
   vddList.forEach((v,i)=>{
@@ -1989,30 +1994,62 @@ function renderCmpPage(){
     vRow.appendChild(b);
   });
 
-  // ── Build TSL filter ───────────────────────────────────────────
+  // ── TSL filter (rebuild each time) ────────────────────────────
   const tslRow=document.getElementById('cmp-tsl-row');
-  if(!tslRow.children.length){
-    allTsls.forEach(t=>{
+  tslRow.innerHTML='';
+  allTsls.forEach(t=>{
+    const b=document.createElement('button');
+    b.className='btn'+(CMP_TSL_SHOW[t]!==false?' active':'');
+    b.id='cmp-tsl-'+t;
+    b.textContent=t;
+    b.onclick=()=>toggleCmpTsl(t);
+    tslRow.appendChild(b);
+  });
+
+  // ── Cell-type filter (rebuild each time) ──────────────────────
+  const cellRow=document.getElementById('cmp-cell-row');
+  cellRow.innerHTML='';
+  allTypes.forEach(ct=>{
+    const b=document.createElement('button');
+    b.className='btn'+(CMP_CELL_SHOW[ct]!==false?' active':'');
+    b.id='cmp-cell-'+ct;
+    b.textContent=ct;
+    b.onclick=()=>toggleCmpCell(ct);
+    cellRow.appendChild(b);
+  });
+
+  // ── Table metric selector (single-select) ─────────────────────
+  const tmRow=document.getElementById('cmp-table-metric-row');
+  if(!tmRow.children.length){
+    Object.keys(METRICS_LABEL).forEach(m=>{
       const b=document.createElement('button');
-      b.className='btn active';
-      b.id='cmp-tsl-'+t;
-      b.textContent=t;
-      b.onclick=()=>toggleCmpTsl(t);
-      tslRow.appendChild(b);
+      b.className='btn'+(m===cmpTableMetric?' active':'');
+      b.dataset.cmpTm=m;
+      b.textContent=METRICS_LABEL[m];
+      b.onclick=()=>setCmpTableMetric(m);
+      tmRow.appendChild(b);
     });
   }
 
-  // ── Build cell-type filter ─────────────────────────────────────
-  const cellRow=document.getElementById('cmp-cell-row');
-  if(!cellRow.children.length){
-    allTypes.forEach(ct=>{
-      const b=document.createElement('button');
-      b.className='btn active';
-      b.id='cmp-cell-'+ct;
-      b.textContent=ct;
-      b.onclick=()=>toggleCmpCell(ct);
-      cellRow.appendChild(b);
-    });
+  // ── Chain comparison section ───────────────────────────────────
+  const chainModels=cmpGetChainModels();
+  const chainSec=document.getElementById('cmp-chain-section');
+  chainSec.style.display=chainModels.length>=2?'':'none';
+  if(chainModels.length>=2){
+    document.getElementById('cmp-chain-info').textContent=
+      `Comparing 101-stage chain per-stage values across ${chainModels.length} models with chain data: ${chainModels.map(m=>m.name).join(', ')}. Baseline = ${chainModels[0].name}.`;
+    const cmRow=document.getElementById('cmp-chain-metric-row');
+    if(!cmRow.children.length){
+      const CHAIN_METRICS={stage_delay:'Stage Delay (ps)',acceff:'ACCeff/Ceff (fF)',acreff:'ACReff (Ω)',iddq:'IDDQ (nA/stage)'};
+      Object.entries(CHAIN_METRICS).forEach(([m,lbl])=>{
+        const b=document.createElement('button');
+        b.className='btn'+(m===cmpChainMetric?' active':'');
+        b.dataset.cmpCm=m;
+        b.textContent=lbl;
+        b.onclick=()=>setCmpChainMetric(m);
+        cmRow.appendChild(b);
+      });
+    }
   }
 
   cmpRenderCharts();
@@ -2020,90 +2057,93 @@ function renderCmpPage(){
 
 function cmpRenderCharts(){
   const models=cmpGetModels();
-  const vddList=cmpGetVddList();
   const allCells=cmpGetAllCells();
-  const sc=METRICS_SCALE[cmpMetric]||1;
-  const lbl=METRICS_LABEL[cmpMetric];
   const vi=cmpVddIdx;
+  const container=document.getElementById('cmp-metric-charts');
 
-  // Visible cells after filters
+  cmpBarObjs.forEach(c=>c.destroy()); cmpBarObjs=[];
+  cmpDeltaObjs.forEach(c=>c.destroy()); cmpDeltaObjs=[];
+
   const visCells=allCells.filter(c=>{
     const tsl=c.slice(0,4);const ct=c.slice(5);
     return CMP_TSL_SHOW[tsl]!==false && CMP_CELL_SHOW[ct]!==false;
   });
 
-  // ── Grouped bar chart ──────────────────────────────────────────
-  const datasets_bar=models.map((md,mi)=>({
+  const baseMd=models[0];
+  const selMetrics=[...cmpMetrics];
+
+  container.innerHTML='';
+  selMetrics.forEach(metric=>{
+    const sc=METRICS_SCALE[metric]||1;
+    const lbl=METRICS_LABEL[metric];
+    const barId='cmpBar_'+metric;
+    const deltaId='cmpDelta_'+metric;
+    const wrap=document.createElement('div');
+    wrap.style.cssText='margin-bottom:18px';
+    wrap.innerHTML=`
+      <div style="font-size:11px;color:#7a85a0;margin:6px 0 4px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">${lbl} — all models at VDD=${cmpGetVddList()[vi]||'?'}V</div>
+      <div class="chart-card wide"><canvas id="${barId}" height="80"></canvas></div>
+      ${models.length>1?`<div style="font-size:10px;color:#57606a;margin:4px 0 2px">Δ% vs baseline (${baseMd.name}) · positive = slower/larger</div>
+      <div class="chart-card wide"><canvas id="${deltaId}" height="55"></canvas></div>`:''}
+    `;
+    container.appendChild(wrap);
+    const datasets_bar=models.map((md,mi)=>({
     label: md.name,
     backgroundColor: cmpModelColor(mi)+'cc',
     borderColor: cmpModelColor(mi),
-    borderWidth: 1,
-    data: visCells.map(c=>{
-      const v=md.data[c]?.[cmpMetric]?.[vi];
-      return v!=null ? +(v*sc).toFixed(4) : null;
-    })
+    borderWidth:1,
+    data:visCells.map(c=>{const v=md.data[c]?.[metric]?.[vi];return v!=null?+(v*sc).toFixed(4):null;})
   }));
-
-  const barOpts={
-    responsive:true,animation:false,
-    plugins:{
-      legend:{labels:{color:'#7a85a0',font:{size:11},boxWidth:12}},
-      tooltip:{callbacks:{label:i=>`${i.dataset.label}: ${i.raw!=null?fmtVal(i.raw/sc,cmpMetric):'—'}`}}
-    },
-    scales:{
-      x:{ticks:{color:'#7a85a0',font:{size:9},maxRotation:50},grid:{color:'#1c2030'}},
-      y:{ticks:{color:'#7a85a0',font:{size:10}},grid:{color:'#1c2030'},
-         title:{display:true,text:lbl,color:'#7a85a0',font:{size:10}}}
+    const barObj=new Chart(document.getElementById(barId),{
+      type:'bar',
+      data:{labels:visCells,datasets:datasets_bar},
+      options:{responsive:true,animation:false,
+        plugins:{legend:{labels:{color:'#7a85a0',font:{size:11},boxWidth:12}},
+          tooltip:{callbacks:{label:i=>`${i.dataset.label}: ${i.raw!=null?fmtVal(i.raw/sc,metric):'—'}`}}},
+        scales:{x:{ticks:{color:'#7a85a0',font:{size:9},maxRotation:50},grid:{color:'#1c2030'}},
+          y:{ticks:{color:'#7a85a0',font:{size:10}},grid:{color:'#1c2030'},
+             title:{display:true,text:lbl,color:'#7a85a0',font:{size:10}}}}}
+    });
+    cmpBarObjs.push(barObj);
+    if(models.length>1){
+      const datasets_delta=models.slice(1).map((md,mi)=>({
+        label:md.name+' vs '+baseMd.name,
+        backgroundColor:cmpModelColor(mi+1)+'cc',
+        borderColor:cmpModelColor(mi+1),
+        borderWidth:1,
+        data:visCells.map(c=>{
+          const vb=baseMd.data[c]?.[metric]?.[vi];const vt=md.data[c]?.[metric]?.[vi];
+          if(vb==null||vt==null||vb===0) return null;
+          return +((vt-vb)/vb*100).toFixed(2);
+        })
+      }));
+      const dObj=new Chart(document.getElementById(deltaId),{
+        type:'bar',
+        data:{labels:visCells,datasets:datasets_delta},
+        options:{responsive:true,animation:false,
+          plugins:{legend:{labels:{color:'#7a85a0',font:{size:11},boxWidth:12}},
+            tooltip:{callbacks:{label:i=>`${i.dataset.label}: ${i.raw!=null?i.raw.toFixed(2)+'%':'—'}`}}},
+          scales:{x:{ticks:{color:'#7a85a0',font:{size:9},maxRotation:50},grid:{color:'#1c2030'}},
+            y:{ticks:{color:'#7a85a0',font:{size:10},callback:v=>v.toFixed(1)+'%'},grid:{color:'#1c2030'},
+               title:{display:true,text:'Δ% vs '+baseMd.name,color:'#7a85a0',font:{size:10}}}}}
+      });
+      cmpDeltaObjs.push(dObj);
     }
-  };
-
-  if(cmpBarObj){cmpBarObj.destroy();cmpBarObj=null;}
-  cmpBarObj=new Chart(document.getElementById('cmpBarChart'),{
-    type:'bar',
-    data:{labels:visCells,datasets:datasets_bar},
-    options:{...barOpts,plugins:{...barOpts.plugins}}
   });
 
-  // ── Baseline = first/fastest model (model[0]) ──────────────────
-  const baseMd=models[0];
-  document.getElementById('cmp-baseline-label').textContent=
-    `Baseline: ${baseMd.name}  ·  Positive Δ% = slower/larger than baseline  ·  Negative Δ% = faster/smaller`;
+  cmpRenderTable();
+  cmpRenderChainSection();
+  cmpRenderObservations(models,visCells,vi);
+}
 
-  const datasets_delta=models.slice(1).map((md,mi)=>({
-    label: md.name+' vs '+baseMd.name,
-    backgroundColor: cmpModelColor(mi+1)+'cc',
-    borderColor: cmpModelColor(mi+1),
-    borderWidth: 1,
-    data: visCells.map(c=>{
-      const vBase=baseMd.data[c]?.[cmpMetric]?.[vi];
-      const vThis=md.data[c]?.[cmpMetric]?.[vi];
-      if(vBase==null||vThis==null||vBase===0) return null;
-      return +((vThis-vBase)/vBase*100).toFixed(2);
-    })
-  }));
-
-  if(cmpDeltaObj){cmpDeltaObj.destroy();cmpDeltaObj=null;}
-  if(models.length>1){
-    cmpDeltaObj=new Chart(document.getElementById('cmpDeltaChart'),{
-      type:'bar',
-      data:{labels:visCells,datasets:datasets_delta},
-      options:{
-        responsive:true,animation:false,
-        plugins:{
-          legend:{labels:{color:'#7a85a0',font:{size:11},boxWidth:12}},
-          tooltip:{callbacks:{label:i=>`${i.dataset.label}: ${i.raw!=null?i.raw.toFixed(2)+'%':'—'}`}}
-        },
-        scales:{
-          x:{ticks:{color:'#7a85a0',font:{size:9},maxRotation:50},grid:{color:'#1c2030'}},
-          y:{ticks:{color:'#7a85a0',font:{size:10},callback:v=>v.toFixed(1)+'%'},
-             grid:{color:'#1c2030'},
-             title:{display:true,text:'Δ% vs '+baseMd.name,color:'#7a85a0',font:{size:10}}}
-        }
-      }
-    });
-  }
-
-  // ── Cross-model table ──────────────────────────────────────────
+function cmpRenderTable(){
+  const models=cmpGetModels();
+  const allCells=cmpGetAllCells();
+  const vi=cmpVddIdx;
+  const metric=cmpTableMetric;
+  const visCells=allCells.filter(c=>{
+    return CMP_TSL_SHOW[c.slice(0,4)]!==false && CMP_CELL_SHOW[c.slice(5)]!==false;
+  });
   const thead=document.getElementById('cmp-thead');
   const tbody=document.getElementById('cmp-tbody');
   thead.innerHTML='<tr><th>TSL</th><th>Cell</th>'+
@@ -2111,7 +2151,7 @@ function cmpRenderCharts(){
     (models.length>1?models.slice(1).map((md,mi)=>`<th style="text-align:right;color:${cmpModelColor(mi+1)}">Δ% vs base</th>`).join(''):'')+'</tr>';
   tbody.innerHTML=visCells.map(c=>{
     const tsl=c.slice(0,4);const ct=c.slice(5);
-    const vals=models.map(md=>md.data[c]?.[cmpMetric]?.[vi]);
+    const vals=models.map(md=>md.data[c]?.[metric]?.[vi]);
     const base=vals[0];
     const deltaCells=models.slice(1).map((_,mi)=>{
       const v=vals[mi+1];
@@ -2123,13 +2163,96 @@ function cmpRenderCharts(){
     return `<tr>
       <td><span class="chip chip${parseInt(tsl)}">${tsl}</span></td>
       <td style="font-size:12px">${ct}</td>
-      ${vals.map(v=>`<td class="mono" style="text-align:right">${v!=null?fmtVal(v,cmpMetric):'—'}</td>`).join('')}
+      ${vals.map(v=>`<td class="mono" style="text-align:right">${v!=null?fmtVal(v,metric):'—'}</td>`).join('')}
       ${deltaCells.join('')}
     </tr>`;
   }).join('');
+}
 
-  // ── Observations & conclusions ─────────────────────────────────
-  cmpRenderObservations(models,visCells,vi);
+function cmpRenderChainSection(){
+  const chainModels=cmpGetChainModels();
+  if(chainModels.length<2) return;
+  cmpChainObjs.forEach(c=>c.destroy()); cmpChainObjs=[];
+  const metric=cmpChainMetric;
+  const sc=METRICS_SCALE[metric]||1;
+  const lbl=METRICS_LABEL[metric];
+  const allChainCells=cmpGetAllChainCells();
+  const baseMd=chainModels[0];
+  const container=document.getElementById('cmp-chain-charts');
+  const barId='cmpChainBar';
+  const deltaId='cmpChainDelta';
+  container.innerHTML=`
+    <div class="chart-card wide"><canvas id="${barId}" height="80"></canvas></div>
+    ${chainModels.length>1?`<div style="font-size:10px;color:#57606a;margin:6px 0 2px">Δ% vs baseline chain (${baseMd.name})</div>
+    <div class="chart-card wide"><canvas id="${deltaId}" height="55"></canvas></div>`:''}
+  `;
+  const chainKey={stage_delay:'stage_delay',acceff:'ceff',acreff:'acreff',iddq:'iddq_per_stage'}[metric]||metric;
+  const datasets_bar=chainModels.map((md,mi)=>({
+    label:md.name,
+    backgroundColor:cmpModelColor(mi)+'cc',
+    borderColor:cmpModelColor(mi),
+    borderWidth:1,
+    data:allChainCells.map(c=>{
+      const v=md.chain_cells?.includes(c)?md.chain_data?.[c]?.[chainKey]:null;
+      return v!=null?+(v*sc).toFixed(4):null;
+    })
+  }));
+  const barObj=new Chart(document.getElementById(barId),{
+    type:'bar',
+    data:{labels:allChainCells,datasets:datasets_bar},
+    options:{responsive:true,animation:false,
+      plugins:{legend:{labels:{color:'#7a85a0',font:{size:11},boxWidth:12}},
+        tooltip:{callbacks:{label:i=>`${i.dataset.label}: ${i.raw!=null?fmtVal(i.raw/sc,metric):'—'}`}}},
+      scales:{x:{ticks:{color:'#7a85a0',font:{size:9},maxRotation:50},grid:{color:'#1c2030'}},
+        y:{ticks:{color:'#7a85a0',font:{size:10}},grid:{color:'#1c2030'},
+           title:{display:true,text:lbl+' (chain per-stage)',color:'#7a85a0',font:{size:10}}}}}
+  });
+  cmpChainObjs.push(barObj);
+  if(chainModels.length>1){
+    const datasets_delta=chainModels.slice(1).map((md,mi)=>({
+      label:md.name+' vs '+baseMd.name,
+      backgroundColor:cmpModelColor(mi+1)+'cc',
+      borderColor:cmpModelColor(mi+1),
+      borderWidth:1,
+      data:allChainCells.map(c=>{
+        const vb=baseMd.chain_data?.[c]?.[chainKey];
+        const vt=md.chain_data?.[c]?.[chainKey];
+        if(vb==null||vt==null||vb===0) return null;
+        return +((vt-vb)/vb*100).toFixed(2);
+      })
+    }));
+    const dObj=new Chart(document.getElementById(deltaId),{
+      type:'bar',
+      data:{labels:allChainCells,datasets:datasets_delta},
+      options:{responsive:true,animation:false,
+        plugins:{legend:{labels:{color:'#7a85a0',font:{size:11},boxWidth:12}},
+          tooltip:{callbacks:{label:i=>`${i.dataset.label}: ${i.raw!=null?i.raw.toFixed(2)+'%':'—'}`}}},
+        scales:{x:{ticks:{color:'#7a85a0',font:{size:9},maxRotation:50},grid:{color:'#1c2030'}},
+          y:{ticks:{color:'#7a85a0',font:{size:10},callback:v=>v.toFixed(1)+'%'},grid:{color:'#1c2030'},
+             title:{display:true,text:'Δ% chain per-stage vs '+baseMd.name,color:'#7a85a0',font:{size:10}}}}}
+    });
+    cmpChainObjs.push(dObj);
+  }
+  const thead=document.getElementById('cmp-chain-thead');
+  const tbody=document.getElementById('cmp-chain-tbody');
+  thead.innerHTML='<tr><th>Cell</th>'+
+    chainModels.map((md,mi)=>`<th style="text-align:right;color:${cmpModelColor(mi)}">${md.name}</th>`).join('')+
+    (chainModels.length>1?chainModels.slice(1).map((md,mi)=>`<th style="text-align:right;color:${cmpModelColor(mi+1)}">Δ% vs base</th>`).join(''):'')+'</tr>';
+  tbody.innerHTML=allChainCells.map(c=>{
+    const vals=chainModels.map(md=>md.chain_data?.[c]?.[chainKey]);
+    const base=vals[0];
+    const deltaCells=chainModels.slice(1).map((_,mi)=>{
+      const v=vals[mi+1];
+      if(base==null||v==null||base===0) return '<td class="mono" style="text-align:right">—</td>';
+      const pct=((v-base)/base*100);
+      const col=pct>5?'#ff6b35':pct<-5?'#00ff9f':'#7a85a0';
+      return `<td class="mono" style="text-align:right;color:${col}">${pct>0?'+':''}${pct.toFixed(2)}%</td>`;
+    });
+    return `<tr><td style="font-size:12px">${c}</td>
+      ${vals.map(v=>`<td class="mono" style="text-align:right">${v!=null?fmtVal(v,metric):'—'}</td>`).join('')}
+      ${deltaCells.join('')}
+    </tr>`;
+  }).join('');
 }
 
 function cmpRenderObservations(models,visCells,vi){
@@ -2138,16 +2261,16 @@ function cmpRenderObservations(models,visCells,vi){
     document.getElementById('cmp-takeaway-list').innerHTML='<li>Only one model registered. Register additional models to enable comparison.</li>';
     return;
   }
-  const sc=METRICS_SCALE[cmpMetric]||1;
-  const lbl=METRICS_LABEL[cmpMetric];
+  const metric=[...cmpMetrics][0]||'stage_delay';
+  const sc=METRICS_SCALE[metric]||1;
+  const lbl=METRICS_LABEL[metric];
   const baseMd=models[0];
 
-  // Per-cell delta arrays for each non-baseline model
   const modelDeltas=models.slice(1).map(md=>({
     name:md.name,
     deltas:visCells.map(c=>{
-      const vb=baseMd.data[c]?.[cmpMetric]?.[vi];
-      const vc=md.data[c]?.[cmpMetric]?.[vi];
+      const vb=baseMd.data[c]?.[metric]?.[vi];
+      const vc=md.data[c]?.[metric]?.[vi];
       if(vb==null||vc==null||vb===0) return null;
       return (vc-vb)/vb*100;
     }).filter(x=>x!=null)
@@ -2163,9 +2286,8 @@ function cmpRenderObservations(models,visCells,vi){
   visCells.forEach(c=>{
     let best=null,bestMd=null;
     models.forEach(md=>{
-      const v=md.data[c]?.[cmpMetric]?.[vi];
+      const v=md.data[c]?.[metric]?.[vi];
       if(v==null) return;
-      // For delay/iddq/acreff: lower is better; for acceff lower is also better
       if(best==null||v<best){best=v;bestMd=md.name;}
     });
     if(bestMd) winCount[bestMd]=(winCount[bestMd]||0)+1;
@@ -2173,26 +2295,23 @@ function cmpRenderObservations(models,visCells,vi){
   const winnerName=Object.entries(winCount).sort((a,b)=>b[1]-a[1])[0]?.[0]||baseMd.name;
   const winnerCount=winCount[winnerName];
 
-  // TSL breakdown: average delta per TSL track height
   const tslDeltas={};
   visCells.forEach(c=>{
     const tsl=c.slice(0,4);
-    const vb=baseMd.data[c]?.[cmpMetric]?.[vi];
+    const vb=baseMd.data[c]?.[metric]?.[vi];
     models.slice(1).forEach(md=>{
-      const vc=md.data[c]?.[cmpMetric]?.[vi];
+      const vc=md.data[c]?.[metric]?.[vi];
       if(vb==null||vc==null||vb===0) return;
       if(!tslDeltas[tsl]) tslDeltas[tsl]=[];
       tslDeltas[tsl].push((vc-vb)/vb*100);
     });
   });
-
-  // Cell-type breakdown
   const ctDeltas={};
   visCells.forEach(c=>{
     const ct=c.slice(5);
-    const vb=baseMd.data[c]?.[cmpMetric]?.[vi];
+    const vb=baseMd.data[c]?.[metric]?.[vi];
     models.slice(1).forEach(md=>{
-      const vc=md.data[c]?.[cmpMetric]?.[vi];
+      const vc=md.data[c]?.[metric]?.[vi];
       if(vb==null||vc==null||vb===0) return;
       if(!ctDeltas[ct]) ctDeltas[ct]=[];
       ctDeltas[ct].push((vc-vb)/vb*100);
@@ -2204,31 +2323,26 @@ function cmpRenderObservations(models,visCells,vi){
   const biggestCtEntry=Object.entries(ctDeltas).sort((a,b)=>Math.abs(avg(b[1]))-Math.abs(avg(a[1])))[0];
 
   const obs=modelDeltas.map(md=>{
-    const a=avg(md.deltas);
-    const r=rng(md.deltas);
+    const a=avg(md.deltas);const r=rng(md.deltas);
     return `• ${md.name} is on average ${Math.abs(a).toFixed(2)}% ${sign(a)} ${baseMd.name} for ${lbl} across ${md.deltas.length} cells (range: ${r}).`;
   }).join('\n');
   document.getElementById('cmp-obs').textContent=obs;
 
-  const tslLine=biggestTslEntry
-    ?`${biggestTslEntry[0]} shows the largest average difference (${avg(biggestTslEntry[1]).toFixed(2)}%)`
-    :'';
-  const ctLine=biggestCtEntry
-    ?`${biggestCtEntry[0]} cells show the largest average delta (${avg(biggestCtEntry[1]).toFixed(2)}%)`
-    :'';
+  const tslLine=biggestTslEntry?`${biggestTslEntry[0]} shows the largest average difference (${avg(biggestTslEntry[1]).toFixed(2)}%)`:'';
+  const ctLine=biggestCtEntry?`${biggestCtEntry[0]} cells show the largest average delta (${avg(biggestCtEntry[1]).toFixed(2)}%)`:'';
   const consistencyLine=modelDeltas.map(md=>{
     const spread=md.deltas.length>1?Math.max(...md.deltas)-Math.min(...md.deltas):0;
     const a=avg(md.deltas);
-    const systematic=spread<5?' — highly consistent (< 5% spread across cells, topology-independent process change)':` — cell-dependent (${spread.toFixed(1)}% spread, possibly layout or topology sensitive)`;
-    return `<li><strong>${md.name} vs ${baseMd.name}:</strong> average ${lbl} delta ${a!=null?(a>0?'+':'')+a.toFixed(2)+'%':'—'}${systematic}. Winner on ${winCount[md.name]||0}/${visCells.length} cells.</li>`;
+    const sys=spread<5?' — highly consistent (< 5% spread, topology-independent process change)':` — cell-dependent (${spread.toFixed(1)}% spread, possibly layout or topology sensitive)`;
+    return `<li><strong>${md.name} vs ${baseMd.name}:</strong> avg ${lbl} delta ${a!=null?(a>0?'+':'')+a.toFixed(2)+'%':'—'}${sys}. Best on ${winCount[md.name]||0}/${visCells.length} cells.</li>`;
   }).join('');
 
   document.getElementById('cmp-takeaway-list').innerHTML=`
-    <li><strong>Best ${lbl} across most cells: ${winnerName}</strong> (wins ${winnerCount}/${visCells.length} cells at VDD=${cmpGetVddList()[vi]||'?'}V). Lower is better for delay, IDDQ, and capacitance metrics.</li>
-    ${tslLine?`<li><strong>TSL sensitivity:</strong> ${tslLine} across all compared models. ${smallestTslEntry&&smallestTslEntry[0]!==biggestTslEntry[0]?smallestTslEntry[0]+' shows the smallest delta ('+avg(smallestTslEntry[1]).toFixed(2)+'%), suggesting the track-height effect interacts with technology scaling.':''}</li>`:''}
-    ${ctLine?`<li><strong>Cell-type sensitivity:</strong> ${ctLine}. Complex cells (AOI/OAI) typically amplify process differences versus inverter cells due to their stacked transistor topology.</li>`:''}
+    <li><strong>Best ${lbl} across most cells: ${winnerName}</strong> (wins ${winnerCount}/${visCells.length} cells at VDD=${cmpGetVddList()[vi]||'?'}V). Lower is better for all metrics.</li>
+    ${tslLine?`<li><strong>TSL sensitivity:</strong> ${tslLine}. ${smallestTslEntry&&smallestTslEntry[0]!==biggestTslEntry[0]?smallestTslEntry[0]+' shows the smallest delta ('+avg(smallestTslEntry[1]).toFixed(2)+'%).':''}</li>`:''}
+    ${ctLine?`<li><strong>Cell-type sensitivity:</strong> ${ctLine}. Complex AOI/OAI cells typically amplify process differences vs inverters.</li>`:''}
     ${consistencyLine}
-    <li><strong>How to interpret Δ%:</strong> A tight spread (< 5%) across all cells indicates a <em>systematic process node shift</em> — the new model is uniformly faster/slower. A wide spread (> 10%) indicates <em>cell- or topology-specific</em> optimisation or parasitic modeling differences that engineers should investigate per-cell.</li>`;
+    <li><strong>How to interpret Δ%:</strong> Tight spread (&lt;5%) = systematic process shift. Wide spread (&gt;10%) = cell/topology-specific difference — investigate per-cell.</li>`;
 }
 
 // ═══════════════════════════════════════════════════════════════════
