@@ -1923,7 +1923,10 @@ function cmpGetAllCells(){ const s=new Set();cmpGetModels().forEach(d=>d.cells.f
 function cmpGetAllTsls(){ const s=new Set();cmpGetModels().forEach(d=>(d.tsl_order||[...new Set(d.cells.map(c=>c.slice(0,4)))]).forEach(t=>s.add(t)));return[...s]; }
 function cmpGetAllCellTypes(){ const s=new Set();cmpGetModels().forEach(d=>d.cells.forEach(c=>s.add(c.slice(5))));return[...s]; }
 function cmpGetChainModels(){ return cmpGetModels().filter(d=>d.chain_cells&&d.chain_cells.length>0); }
-function cmpGetAllChainCells(){ const s=new Set();cmpGetChainModels().forEach(d=>d.chain_cells.forEach(c=>s.add(c)));return[...s]; }
+// chain_cells is an array of {label,stage_delay,ceff,acreff,iddq} objects — extract labels
+function cmpGetAllChainCells(){ const s=new Set();cmpGetChainModels().forEach(d=>d.chain_cells.forEach(c=>s.add(c.label)));return[...s]; }
+// Look up a value from chain_cells by cell label and field name
+function chainVal(md,cellLabel,key){ return md.chain_cells?.find(c=>c.label===cellLabel)?.[key]??null; }
 
 // Single-select metric — radio style like the sweep page
 function setCmpMetric(m){
@@ -2157,26 +2160,27 @@ function cmpRenderChainSection(){
     ${chainModels.length>1?`<div style="font-size:10px;color:#57606a;margin:6px 0 2px">Δ% vs baseline chain (${baseMd.name})</div>
     <div class="chart-card wide"><canvas id="${deltaId}" height="55"></canvas></div>`:''}
   `;
-  const chainKey={stage_delay:'stage_delay',acceff:'ceff',acreff:'acreff',iddq:'iddq_per_stage'}[metric]||metric;
+  // chain_cells values are already in display units (ps, fF, KΩ, nA) — no scale multiplication
+  // chainKey maps UI metric name to field name in chain_cells objects
+  const chainKey={stage_delay:'stage_delay',acceff:'ceff',acreff:'acreff',iddq:'iddq'}[metric]||metric;
+  const CHAIN_UNIT={stage_delay:'ps',acceff:'fF',acreff:'KΩ',iddq:'nA'};
+  const chainUnit=CHAIN_UNIT[metric]||'';
   const datasets_bar=chainModels.map((md,mi)=>({
     label:md.name,
     backgroundColor:cmpModelColor(mi)+'cc',
     borderColor:cmpModelColor(mi),
     borderWidth:1,
-    data:allChainCells.map(c=>{
-      const v=md.chain_cells?.includes(c)?md.chain_data?.[c]?.[chainKey]:null;
-      return v!=null?+(v*sc).toFixed(4):null;
-    })
+    data:allChainCells.map(c=>{const v=chainVal(md,c,chainKey);return v!=null?+v.toFixed(4):null;})
   }));
   const barObj=new Chart(document.getElementById(barId),{
     type:'bar',
     data:{labels:allChainCells,datasets:datasets_bar},
     options:{responsive:true,animation:false,
       plugins:{legend:{labels:{color:'#7a85a0',font:{size:11},boxWidth:12}},
-        tooltip:{callbacks:{label:i=>`${i.dataset.label}: ${i.raw!=null?fmtVal(i.raw/sc,metric):'—'}`}}},
+        tooltip:{callbacks:{label:i=>`${i.dataset.label}: ${i.raw!=null?i.raw.toFixed(3)+' '+chainUnit:'—'}`}}},
       scales:{x:{ticks:{color:'#7a85a0',font:{size:9},maxRotation:50},grid:{color:'#1c2030'}},
         y:{ticks:{color:'#7a85a0',font:{size:10}},grid:{color:'#1c2030'},
-           title:{display:true,text:lbl+' (chain per-stage)',color:'#7a85a0',font:{size:10}}}}}
+           title:{display:true,text:lbl+' ('+chainUnit+')',color:'#7a85a0',font:{size:10}}}}}
   });
   cmpChainObjs.push(barObj);
   if(chainModels.length>1){
@@ -2186,8 +2190,8 @@ function cmpRenderChainSection(){
       borderColor:cmpModelColor(mi+1),
       borderWidth:1,
       data:allChainCells.map(c=>{
-        const vb=baseMd.chain_data?.[c]?.[chainKey];
-        const vt=md.chain_data?.[c]?.[chainKey];
+        const vb=chainVal(baseMd,c,chainKey);
+        const vt=chainVal(md,c,chainKey);
         if(vb==null||vt==null||vb===0) return null;
         return +((vt-vb)/vb*100).toFixed(2);
       })
@@ -2210,7 +2214,7 @@ function cmpRenderChainSection(){
     chainModels.map((md,mi)=>`<th style="text-align:right;color:${cmpModelColor(mi)}">${md.name}</th>`).join('')+
     (chainModels.length>1?chainModels.slice(1).map((md,mi)=>`<th style="text-align:right;color:${cmpModelColor(mi+1)}">Δ% vs base</th>`).join(''):'')+'</tr>';
   tbody.innerHTML=allChainCells.map(c=>{
-    const vals=chainModels.map(md=>md.chain_data?.[c]?.[chainKey]);
+    const vals=chainModels.map(md=>chainVal(md,c,chainKey));
     const base=vals[0];
     const deltaCells=chainModels.slice(1).map((_,mi)=>{
       const v=vals[mi+1];
@@ -2220,7 +2224,7 @@ function cmpRenderChainSection(){
       return `<td class="mono" style="text-align:right;color:${col}">${pct>0?'+':''}${pct.toFixed(2)}%</td>`;
     });
     return `<tr><td style="font-size:12px">${c}</td>
-      ${vals.map(v=>`<td class="mono" style="text-align:right">${v!=null?fmtVal(v,metric):'—'}</td>`).join('')}
+      ${vals.map(v=>`<td class="mono" style="text-align:right">${v!=null?v.toFixed(3)+' '+chainUnit:'—'}</td>`).join('')}
       ${deltaCells.join('')}
     </tr>`;
   }).join('');
