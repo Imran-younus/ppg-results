@@ -111,6 +111,10 @@
 *.inc '/afs/apd/ant/research/dev/2HP/V0.51/Spice-rext/design_include.inc'
 *.lib /afs/apd/ant/research/dev/2HP/V0.51/Spice-rext/fixed_corner.lib TT
 
+* v0.53 Titan PDK uses V0.51 LVS/SPICE (prod release, January 23 2026)
+*.inc '/afs/apd/ant/research/prod/2HP/V0.51/Spice/design_include.inc'
+*.lib /afs/apd/ant/research/prod/2HP/V0.51/Spice/fixed_corner.lib TT
+
 * v0.6SB model (same as v0.51 but with 29.26 aF/um Cov adder)
 *.inc '/afs/apd/ant/research/test/2HP/v0.53/Spice-260520-sandbox/design_include.inc'
 *.lib /afs/apd/ant/research/test/2HP/v0.53/Spice-260520-sandbox/fixed_corner.lib TT
@@ -131,7 +135,7 @@
 *.inc '/afs/apd/ant/research/test/2HP/v0.53/Spice-260616-sandbox/design_include.inc'
 *.lib /afs/apd/ant/research/test/2HP/v0.53/Spice-260616-sandbox/fixed_corner.lib TT
 
-* IIM Mintaka V0.430
+* IIM Mintaka V0.430 (Rapidus PDK0.43 SPICE)
 *.inc '/afs/apd/ant/cte_tech/1p4/IIMmintaka/common/pdk/IIM/SpiceModel_V0.430/Hspice/design_include.inc'
 *.lib /afs/apd/ant/cte_tech/1p4/IIMmintaka/common/pdk/IIM/SpiceModel_V0.430/Hspice/fixed_corner.lib TT
 
