@@ -127,6 +127,7 @@ footer{border-top:1px solid var(--border);margin-top:40px;padding-top:12px;text-
       <option value="sweep">① Single Stage — VDD Sweep</option>
       <option value="chain">② Chain — Per-Stage Values</option>
       <option value="topo">③ Single Stage vs Chain Comparison</option>
+      <option value="cmp">④ Model Comparison</option>
     </select>
   </div>
   <div class="sel-divider"></div>
@@ -454,6 +455,50 @@ footer{border-top:1px solid var(--border);margin-top:40px;padding-top:12px;text-
 </div>
 
 </div><!-- end #page-topo -->
+
+<!-- PAGE: Model Comparison                                  -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div id="page-cmp" style="display:none">
+
+<section>
+  <div class="section-title"><span class="bar"></span>Model Comparison — Metric at Selected VDD<span class="pg">④</span></div>
+  <div class="controls" id="cmp-controls">
+    <label>Metric:</label>
+    <span id="cmp-metric-row" style="display:inline-flex;flex-wrap:wrap;gap:4px"></span>
+    <div class="sep"></div>
+    <label>VDD:</label>
+    <span id="cmp-vdd-row" style="display:inline-flex;flex-wrap:wrap;gap:4px"></span>
+    <div class="sep"></div>
+    <label>TSL:</label>
+    <span id="cmp-tsl-row" style="display:inline-flex;flex-wrap:wrap;gap:4px"></span>
+    <div class="sep"></div>
+    <label>Cell:</label>
+    <span id="cmp-cell-row" style="display:inline-flex;flex-wrap:wrap;gap:4px"></span>
+  </div>
+  <div class="chart-card wide"><canvas id="cmpBarChart" height="90"></canvas></div>
+</section>
+
+<section>
+  <div class="section-title"><span class="bar"></span>Δ% vs Baseline Model</div>
+  <div class="info-box" id="cmp-baseline-label"></div>
+  <div class="chart-card wide"><canvas id="cmpDeltaChart" height="75"></canvas></div>
+</section>
+
+<section>
+  <div class="section-title"><span class="bar"></span>Cross-Model Data Table</div>
+  <div class="table-wrap"><table id="cmp-table"><thead id="cmp-thead"></thead><tbody id="cmp-tbody"></tbody></table></div>
+</section>
+
+<section>
+  <div class="section-title"><span class="bar"></span>Key Observations &amp; Conclusions</div>
+  <div id="cmp-obs" class="info-box" style="white-space:pre-line;line-height:1.8"></div>
+  <div class="takeaways" id="cmp-takeaways">
+    <h4>Key Takeaways</h4>
+    <ul id="cmp-takeaway-list"></ul>
+  </div>
+</section>
+
+</div><!-- end #page-cmp -->
 
 <footer>PPG Delay Chain Simulation Results &nbsp;·&nbsp; Made with IBM Bob</footer>
 </div><!-- end .page -->
@@ -1015,7 +1060,14 @@ let sweepObj=null,gainSweepObj=null,barObj=null,fomObj=null,
     chainDelayObj=null,chainCeffObj=null,chainAcreffObj=null,chainIddqObj=null,
     corrBarDelay=null,corrBarCeff=null,corrBarAcreff=null,corrPctObj=null,
     corrScDelay=null,corrScCeff=null;
-let chainBuilt=false,topoBuilt=false;
+let cmpBarObj=null,cmpDeltaObj=null;
+let chainBuilt=false,topoBuilt=false,cmpBuilt=false;
+
+// ── Model Comparison state ──────────────────────────────────────────
+let cmpMetric='stage_delay';
+let cmpVddIdx=4;
+const CMP_TSL_SHOW={};   // tsl  → bool
+const CMP_CELL_SHOW={};  // type → bool
 
 // ═══════════════════════════════════════════════════════════════════
 // SELECTOR BAR — model/vt/corner auto-population
@@ -1050,6 +1102,7 @@ function buildSelectors(){
   const pSel=document.getElementById('page-select');
   Array.from(pSel.options).forEach(opt=>{
     opt.hidden=(opt.value==='chain'||opt.value==='topo')&&!hasChain;
+    // cmp is always visible regardless of chain data
   });
 
   // Chain VDD selector — show on chain+topo pages if multiple chain VDDs
@@ -1091,23 +1144,25 @@ function switchChainVdd(vdd){
 function destroyAllCharts(){
   [sweepObj,gainSweepObj,barObj,fomObj,tradeObj,trade2Obj,
    chainDelayObj,chainCeffObj,chainAcreffObj,chainIddqObj,
-   corrBarDelay,corrBarCeff,corrBarAcreff,corrPctObj,corrScDelay,corrScCeff
+   corrBarDelay,corrBarCeff,corrBarAcreff,corrPctObj,corrScDelay,corrScCeff,
+   cmpBarObj,cmpDeltaObj
   ].forEach(c=>{if(c)c.destroy();});
   sweepObj=gainSweepObj=barObj=fomObj=tradeObj=trade2Obj=null;
   chainDelayObj=chainCeffObj=chainAcreffObj=chainIddqObj=null;
   corrBarDelay=corrBarCeff=corrBarAcreff=corrPctObj=corrScDelay=corrScCeff=null;
+  cmpBarObj=cmpDeltaObj=null;
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // PAGE SWITCHING
 // ═══════════════════════════════════════════════════════════════════
 function switchPage(val){
-  // If this model has no chain data, force back to sweep
+  // If this model has no chain data, force back to sweep (except cmp is always available)
   if((val==='chain'||val==='topo')&&!ds().chain_cells){
     val='sweep';
     document.getElementById('page-select').value='sweep';
   }
-  ['page-sweep','page-chain','page-topo'].forEach(id=>document.getElementById(id).style.display='none');
+  ['page-sweep','page-chain','page-topo','page-cmp'].forEach(id=>document.getElementById(id).style.display='none');
   const chainVddGrp=document.getElementById('chain-vdd-group');
   chainVddGrp.style.display='none';
   if(val==='sweep'){
@@ -1117,6 +1172,9 @@ function switchPage(val){
     document.getElementById('page-chain').style.display='';
     chainVddGrp.style.display=document.getElementById('chain-vdd-select').children.length>1?'':'none';
     renderChainPage();
+  } else if(val==='cmp'){
+    document.getElementById('page-cmp').style.display='';
+    renderCmpPage();
   } else {
     document.getElementById('page-topo').style.display='';
     chainVddGrp.style.display=document.getElementById('chain-vdd-select').children.length>1?'':'none';
@@ -1142,12 +1200,15 @@ function updateHeaderMeta(){
   let meta='';
   if(page==='sweep') meta=`${d.simulator} · ${d.model} · ${d.vt} · ${d.corner} Corner · T = ${d.temp} · VDD ${d.vdd_range} · ${d.cells.length} cells · 5 metrics`;
   else if(page==='chain') meta=`${cm.simulator||d.simulator} · ${cm.model||d.model} · ${cm.vt||d.vt} · ${cm.corner||d.corner} Corner · T = ${cm.temp||d.temp} · VDD = ${cm.vdd||'—'} · ${d.chain_cells?.length||0} cells`;
+  else if(page==='cmp'){const allM=cmpGetModels();meta=`Cross-model comparison · ${allM.length} models · ${METRICS_LABEL[cmpMetric]} · VDD=${cmpGetVddList()[cmpVddIdx]||'?'}V`;}
   else meta=`${d.model} ${d.vt} · Single Stage (VDD=${VDD()[vddIdx]}V) vs Chain Per-Stage (VDD=${cm.vdd||'—'}) · ${d.corner} · T = ${d.temp}`;
   document.getElementById('header-meta').textContent=meta;
   const badges=page==='sweep'
     ?`<span class="badge">${d.cells.length} cells</span><span class="badge">${d.tsl_order.join(' / ')}</span><span class="badge">VDD ${d.vdd_range} (${d.vdd.length} pts)</span><span class="badge">${d.vt}</span><span class="badge">${d.corner} · ${d.temp}</span><span class="badge">${d.model}</span>`
     :page==='chain'
     ?`<span class="badge">${d.chain_cells?.length||0} cells</span><span class="badge">${cm.vt||d.vt}</span><span class="badge">${cm.stages||'?'}-stage chain</span><span class="badge">VDD = ${cm.vdd||'—'}</span><span class="badge">${cm.corner||d.corner} · ${cm.temp||d.temp}</span><span class="badge">${cm.model||d.model}</span>`
+    :page==='cmp'
+    ?cmpGetModels().map((m,i)=>`<span class="badge" style="border-color:${cmpModelColor(i)};color:${cmpModelColor(i)}">${m.name}</span>`).join('')+`<span class="badge">VDD=${cmpGetVddList()[cmpVddIdx]||'?'}V</span><span class="badge">${METRICS_LABEL[cmpMetric]}</span>`
     :`<span class="badge" style="border-color:#00d4ff;color:#00d4ff">Single Stage · ${d.model}</span><span class="badge" style="border-color:#ff6b35;color:#ff6b35">Chain Per-Stage · ${cm.model||d.model}</span><span class="badge">VDD = ${cm.vdd||'—'}</span><span class="badge">${d.corner} · ${d.temp}</span>`;
   document.getElementById('header-badges').innerHTML=badges;
 }
@@ -1814,6 +1875,359 @@ function renderTopoPage(){
       <li><strong>ACReff delta (~${avg(arDeltas)}%)</strong> (range: ${rng(arDeltas)}%): The ring's extra wire resistance inflates the intrinsic V/I ratio slightly beyond the isolated-cell value. Units unified to KΩ for direct comparison.</li>
       <li><strong>IDDQ values are not compared</strong>: single-stage IDDQ is a DC static leakage (measured at t=0 ps) while chain per-stage IDDQ is a dynamic switching current in an oscillating ring — fundamentally different physical quantities.</li>`;
   }
+
+// ═══════════════════════════════════════════════════════════════════
+// MODEL COMPARISON
+// ═══════════════════════════════════════════════════════════════════
+
+// Palette: one distinct color per model slot (auto-extends)
+const CMP_MODEL_PALETTE=['#00d4ff','#ff6b35','#00ff9f','#ffe93e','#ff2d78','#bd00ff','#3ee8ff','#ff9500'];
+function cmpModelColor(idx){ return CMP_MODEL_PALETTE[idx%CMP_MODEL_PALETTE.length]; }
+
+// Returns one representative dataset per unique model name (prefer SLVT TT)
+function cmpGetModels(){
+  const seen=new Set();
+  const out=[];
+  Object.values(DATASETS).forEach(d=>{
+    if(!seen.has(d.model)){
+      seen.add(d.model);
+      out.push(d);
+    }
+  });
+  // Sort: chronological by order they appear in DATASETS (registration order)
+  return out;
+}
+
+// Returns the union of all VDD arrays (assume common across datasets)
+function cmpGetVddList(){
+  const models=cmpGetModels();
+  return models[0]?.vdd||[];
+}
+
+// Returns union of all cell names across all model datasets
+function cmpGetAllCells(){
+  const cells=new Set();
+  cmpGetModels().forEach(d=>d.cells.forEach(c=>cells.add(c)));
+  return [...cells];
+}
+
+// Returns union of all TSL tiers across all model datasets
+function cmpGetAllTsls(){
+  const tsls=new Set();
+  cmpGetModels().forEach(d=>(d.tsl_order||[...new Set(d.cells.map(c=>c.slice(0,4)))]).forEach(t=>tsls.add(t)));
+  return [...tsls];
+}
+
+// Returns union of all cell types (suffixes) across all model datasets
+function cmpGetAllCellTypes(){
+  const types=new Set();
+  cmpGetModels().forEach(d=>d.cells.forEach(c=>types.add(c.slice(5))));
+  return [...types];
+}
+
+function setCmpMetric(m){
+  cmpMetric=m;
+  document.querySelectorAll('[data-cmp-m]').forEach(b=>b.classList.toggle('active',b.dataset.cmpM===m));
+  cmpRenderCharts();
+  updateHeaderMeta();
+}
+function setCmpVdd(idx){
+  cmpVddIdx=idx;
+  document.querySelectorAll('[data-cmp-v]').forEach(b=>b.classList.toggle('active',+b.dataset.cmpV===idx));
+  cmpRenderCharts();
+  updateHeaderMeta();
+}
+function toggleCmpTsl(tsl){
+  CMP_TSL_SHOW[tsl]=!CMP_TSL_SHOW[tsl];
+  document.getElementById('cmp-tsl-'+tsl)?.classList.toggle('active',CMP_TSL_SHOW[tsl]);
+  cmpRenderCharts();
+}
+function toggleCmpCell(ct){
+  CMP_CELL_SHOW[ct]=!CMP_CELL_SHOW[ct];
+  document.getElementById('cmp-cell-'+ct)?.classList.toggle('active',CMP_CELL_SHOW[ct]);
+  cmpRenderCharts();
+}
+
+function renderCmpPage(){
+  const models=cmpGetModels();
+  const vddList=cmpGetVddList();
+  const allCells=cmpGetAllCells();
+  const allTsls=cmpGetAllTsls();
+  const allTypes=cmpGetAllCellTypes();
+
+  // Clamp cmpVddIdx
+  if(cmpVddIdx>=vddList.length) cmpVddIdx=Math.min(4,vddList.length-1);
+
+  // Initialise filter state once
+  allTsls.forEach(t=>{ if(CMP_TSL_SHOW[t]==null) CMP_TSL_SHOW[t]=true; });
+  allTypes.forEach(t=>{ if(CMP_CELL_SHOW[t]==null) CMP_CELL_SHOW[t]=true; });
+
+  // ── Build metric selector ──────────────────────────────────────
+  const mRow=document.getElementById('cmp-metric-row');
+  if(!mRow.children.length){
+    Object.keys(METRICS_LABEL).forEach(m=>{
+      const b=document.createElement('button');
+      b.className='btn'+(m===cmpMetric?' active':'');
+      b.dataset.cmpM=m;
+      b.textContent=METRICS_LABEL[m];
+      b.onclick=()=>setCmpMetric(m);
+      mRow.appendChild(b);
+    });
+  }
+
+  // ── Build VDD pill row ─────────────────────────────────────────
+  const vRow=document.getElementById('cmp-vdd-row');
+  vRow.innerHTML='';
+  vddList.forEach((v,i)=>{
+    const b=document.createElement('button');
+    b.className='vdd-pill'+(i===cmpVddIdx?' active':'');
+    b.dataset.cmpV=i;
+    b.textContent=v+'V';
+    b.onclick=()=>setCmpVdd(i);
+    vRow.appendChild(b);
+  });
+
+  // ── Build TSL filter ───────────────────────────────────────────
+  const tslRow=document.getElementById('cmp-tsl-row');
+  if(!tslRow.children.length){
+    allTsls.forEach(t=>{
+      const b=document.createElement('button');
+      b.className='btn active';
+      b.id='cmp-tsl-'+t;
+      b.textContent=t;
+      b.onclick=()=>toggleCmpTsl(t);
+      tslRow.appendChild(b);
+    });
+  }
+
+  // ── Build cell-type filter ─────────────────────────────────────
+  const cellRow=document.getElementById('cmp-cell-row');
+  if(!cellRow.children.length){
+    allTypes.forEach(ct=>{
+      const b=document.createElement('button');
+      b.className='btn active';
+      b.id='cmp-cell-'+ct;
+      b.textContent=ct;
+      b.onclick=()=>toggleCmpCell(ct);
+      cellRow.appendChild(b);
+    });
+  }
+
+  cmpRenderCharts();
+}
+
+function cmpRenderCharts(){
+  const models=cmpGetModels();
+  const vddList=cmpGetVddList();
+  const allCells=cmpGetAllCells();
+  const sc=METRICS_SCALE[cmpMetric]||1;
+  const lbl=METRICS_LABEL[cmpMetric];
+  const vi=cmpVddIdx;
+
+  // Visible cells after filters
+  const visCells=allCells.filter(c=>{
+    const tsl=c.slice(0,4);const ct=c.slice(5);
+    return CMP_TSL_SHOW[tsl]!==false && CMP_CELL_SHOW[ct]!==false;
+  });
+
+  // ── Grouped bar chart ──────────────────────────────────────────
+  const datasets_bar=models.map((md,mi)=>({
+    label: md.name,
+    backgroundColor: cmpModelColor(mi)+'cc',
+    borderColor: cmpModelColor(mi),
+    borderWidth: 1,
+    data: visCells.map(c=>{
+      const v=md.data[c]?.[cmpMetric]?.[vi];
+      return v!=null ? +(v*sc).toFixed(4) : null;
+    })
+  }));
+
+  const barOpts={
+    responsive:true,animation:false,
+    plugins:{
+      legend:{labels:{color:'#7a85a0',font:{size:11},boxWidth:12}},
+      tooltip:{callbacks:{label:i=>`${i.dataset.label}: ${i.raw!=null?fmtVal(i.raw/sc,cmpMetric):'—'}`}}
+    },
+    scales:{
+      x:{ticks:{color:'#7a85a0',font:{size:9},maxRotation:50},grid:{color:'#1c2030'}},
+      y:{ticks:{color:'#7a85a0',font:{size:10}},grid:{color:'#1c2030'},
+         title:{display:true,text:lbl,color:'#7a85a0',font:{size:10}}}
+    }
+  };
+
+  if(cmpBarObj){cmpBarObj.destroy();cmpBarObj=null;}
+  cmpBarObj=new Chart(document.getElementById('cmpBarChart'),{
+    type:'bar',
+    data:{labels:visCells,datasets:datasets_bar},
+    options:{...barOpts,plugins:{...barOpts.plugins}}
+  });
+
+  // ── Baseline = first/fastest model (model[0]) ──────────────────
+  const baseMd=models[0];
+  document.getElementById('cmp-baseline-label').textContent=
+    `Baseline: ${baseMd.name}  ·  Positive Δ% = slower/larger than baseline  ·  Negative Δ% = faster/smaller`;
+
+  const datasets_delta=models.slice(1).map((md,mi)=>({
+    label: md.name+' vs '+baseMd.name,
+    backgroundColor: cmpModelColor(mi+1)+'cc',
+    borderColor: cmpModelColor(mi+1),
+    borderWidth: 1,
+    data: visCells.map(c=>{
+      const vBase=baseMd.data[c]?.[cmpMetric]?.[vi];
+      const vThis=md.data[c]?.[cmpMetric]?.[vi];
+      if(vBase==null||vThis==null||vBase===0) return null;
+      return +((vThis-vBase)/vBase*100).toFixed(2);
+    })
+  }));
+
+  if(cmpDeltaObj){cmpDeltaObj.destroy();cmpDeltaObj=null;}
+  if(models.length>1){
+    cmpDeltaObj=new Chart(document.getElementById('cmpDeltaChart'),{
+      type:'bar',
+      data:{labels:visCells,datasets:datasets_delta},
+      options:{
+        responsive:true,animation:false,
+        plugins:{
+          legend:{labels:{color:'#7a85a0',font:{size:11},boxWidth:12}},
+          tooltip:{callbacks:{label:i=>`${i.dataset.label}: ${i.raw!=null?i.raw.toFixed(2)+'%':'—'}`}}
+        },
+        scales:{
+          x:{ticks:{color:'#7a85a0',font:{size:9},maxRotation:50},grid:{color:'#1c2030'}},
+          y:{ticks:{color:'#7a85a0',font:{size:10},callback:v=>v.toFixed(1)+'%'},
+             grid:{color:'#1c2030'},
+             title:{display:true,text:'Δ% vs '+baseMd.name,color:'#7a85a0',font:{size:10}}}
+        }
+      }
+    });
+  }
+
+  // ── Cross-model table ──────────────────────────────────────────
+  const thead=document.getElementById('cmp-thead');
+  const tbody=document.getElementById('cmp-tbody');
+  thead.innerHTML='<tr><th>TSL</th><th>Cell</th>'+
+    models.map((md,mi)=>`<th style="text-align:right;color:${cmpModelColor(mi)}">${md.name}</th>`).join('')+
+    (models.length>1?models.slice(1).map((md,mi)=>`<th style="text-align:right;color:${cmpModelColor(mi+1)}">Δ% vs base</th>`).join(''):'')+'</tr>';
+  tbody.innerHTML=visCells.map(c=>{
+    const tsl=c.slice(0,4);const ct=c.slice(5);
+    const vals=models.map(md=>md.data[c]?.[cmpMetric]?.[vi]);
+    const base=vals[0];
+    const deltaCells=models.slice(1).map((_,mi)=>{
+      const v=vals[mi+1];
+      if(base==null||v==null||base===0) return '<td class="mono" style="text-align:right">—</td>';
+      const pct=((v-base)/base*100);
+      const col=pct>5?'#ff6b35':pct<-5?'#00ff9f':'#7a85a0';
+      return `<td class="mono" style="text-align:right;color:${col}">${pct>0?'+':''}${pct.toFixed(2)}%</td>`;
+    });
+    return `<tr>
+      <td><span class="chip chip${parseInt(tsl)}">${tsl}</span></td>
+      <td style="font-size:12px">${ct}</td>
+      ${vals.map(v=>`<td class="mono" style="text-align:right">${v!=null?fmtVal(v,cmpMetric):'—'}</td>`).join('')}
+      ${deltaCells.join('')}
+    </tr>`;
+  }).join('');
+
+  // ── Observations & conclusions ─────────────────────────────────
+  cmpRenderObservations(models,visCells,vi);
+}
+
+function cmpRenderObservations(models,visCells,vi){
+  if(models.length<2){
+    document.getElementById('cmp-obs').textContent='Add more model datasets to see cross-model observations.';
+    document.getElementById('cmp-takeaway-list').innerHTML='<li>Only one model registered. Register additional models to enable comparison.</li>';
+    return;
+  }
+  const sc=METRICS_SCALE[cmpMetric]||1;
+  const lbl=METRICS_LABEL[cmpMetric];
+  const baseMd=models[0];
+
+  // Per-cell delta arrays for each non-baseline model
+  const modelDeltas=models.slice(1).map(md=>({
+    name:md.name,
+    deltas:visCells.map(c=>{
+      const vb=baseMd.data[c]?.[cmpMetric]?.[vi];
+      const vc=md.data[c]?.[cmpMetric]?.[vi];
+      if(vb==null||vc==null||vb===0) return null;
+      return (vc-vb)/vb*100;
+    }).filter(x=>x!=null)
+  }));
+
+  function avg(arr){return arr.length?+(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(2):null;}
+  function rng(arr){return arr.length?`${Math.min(...arr).toFixed(1)}% to ${Math.max(...arr).toFixed(1)}%`:'—';}
+  function sign(v){return v>0?'larger/slower than':'smaller/faster than';}
+
+  // Find fastest model per cell and most consistent model
+  const winCount={};
+  models.forEach(md=>{winCount[md.name]=0;});
+  visCells.forEach(c=>{
+    let best=null,bestMd=null;
+    models.forEach(md=>{
+      const v=md.data[c]?.[cmpMetric]?.[vi];
+      if(v==null) return;
+      // For delay/iddq/acreff: lower is better; for acceff lower is also better
+      if(best==null||v<best){best=v;bestMd=md.name;}
+    });
+    if(bestMd) winCount[bestMd]=(winCount[bestMd]||0)+1;
+  });
+  const winnerName=Object.entries(winCount).sort((a,b)=>b[1]-a[1])[0]?.[0]||baseMd.name;
+  const winnerCount=winCount[winnerName];
+
+  // TSL breakdown: average delta per TSL track height
+  const tslDeltas={};
+  visCells.forEach(c=>{
+    const tsl=c.slice(0,4);
+    const vb=baseMd.data[c]?.[cmpMetric]?.[vi];
+    models.slice(1).forEach(md=>{
+      const vc=md.data[c]?.[cmpMetric]?.[vi];
+      if(vb==null||vc==null||vb===0) return;
+      if(!tslDeltas[tsl]) tslDeltas[tsl]=[];
+      tslDeltas[tsl].push((vc-vb)/vb*100);
+    });
+  });
+
+  // Cell-type breakdown
+  const ctDeltas={};
+  visCells.forEach(c=>{
+    const ct=c.slice(5);
+    const vb=baseMd.data[c]?.[cmpMetric]?.[vi];
+    models.slice(1).forEach(md=>{
+      const vc=md.data[c]?.[cmpMetric]?.[vi];
+      if(vb==null||vc==null||vb===0) return;
+      if(!ctDeltas[ct]) ctDeltas[ct]=[];
+      ctDeltas[ct].push((vc-vb)/vb*100);
+    });
+  });
+
+  const biggestTslEntry=Object.entries(tslDeltas).sort((a,b)=>Math.abs(avg(b[1]))-Math.abs(avg(a[1])))[0];
+  const smallestTslEntry=Object.entries(tslDeltas).sort((a,b)=>Math.abs(avg(a[1]))-Math.abs(avg(b[1])))[0];
+  const biggestCtEntry=Object.entries(ctDeltas).sort((a,b)=>Math.abs(avg(b[1]))-Math.abs(avg(a[1])))[0];
+
+  const obs=modelDeltas.map(md=>{
+    const a=avg(md.deltas);
+    const r=rng(md.deltas);
+    return `• ${md.name} is on average ${Math.abs(a).toFixed(2)}% ${sign(a)} ${baseMd.name} for ${lbl} across ${md.deltas.length} cells (range: ${r}).`;
+  }).join('\n');
+  document.getElementById('cmp-obs').textContent=obs;
+
+  const tslLine=biggestTslEntry
+    ?`${biggestTslEntry[0]} shows the largest average difference (${avg(biggestTslEntry[1]).toFixed(2)}%)`
+    :'';
+  const ctLine=biggestCtEntry
+    ?`${biggestCtEntry[0]} cells show the largest average delta (${avg(biggestCtEntry[1]).toFixed(2)}%)`
+    :'';
+  const consistencyLine=modelDeltas.map(md=>{
+    const spread=md.deltas.length>1?Math.max(...md.deltas)-Math.min(...md.deltas):0;
+    const a=avg(md.deltas);
+    const systematic=spread<5?' — highly consistent (< 5% spread across cells, topology-independent process change)':` — cell-dependent (${spread.toFixed(1)}% spread, possibly layout or topology sensitive)`;
+    return `<li><strong>${md.name} vs ${baseMd.name}:</strong> average ${lbl} delta ${a!=null?(a>0?'+':'')+a.toFixed(2)+'%':'—'}${systematic}. Winner on ${winCount[md.name]||0}/${visCells.length} cells.</li>`;
+  }).join('');
+
+  document.getElementById('cmp-takeaway-list').innerHTML=`
+    <li><strong>Best ${lbl} across most cells: ${winnerName}</strong> (wins ${winnerCount}/${visCells.length} cells at VDD=${cmpGetVddList()[vi]||'?'}V). Lower is better for delay, IDDQ, and capacitance metrics.</li>
+    ${tslLine?`<li><strong>TSL sensitivity:</strong> ${tslLine} across all compared models. ${smallestTslEntry&&smallestTslEntry[0]!==biggestTslEntry[0]?smallestTslEntry[0]+' shows the smallest delta ('+avg(smallestTslEntry[1]).toFixed(2)+'%), suggesting the track-height effect interacts with technology scaling.':''}</li>`:''}
+    ${ctLine?`<li><strong>Cell-type sensitivity:</strong> ${ctLine}. Complex cells (AOI/OAI) typically amplify process differences versus inverter cells due to their stacked transistor topology.</li>`:''}
+    ${consistencyLine}
+    <li><strong>How to interpret Δ%:</strong> A tight spread (< 5%) across all cells indicates a <em>systematic process node shift</em> — the new model is uniformly faster/slower. A wide spread (> 10%) indicates <em>cell- or topology-specific</em> optimisation or parasitic modeling differences that engineers should investigate per-cell.</li>`;
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // BOOT
