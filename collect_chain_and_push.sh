@@ -127,3 +127,36 @@ if [ -f "$SCRIPTDIR/verify_dataset_consistency.js" ]; then
         exit 1
     }
 fi
+
+# ── 9. Prompt to push results to GitHub ─────────────────────────────
+echo ""
+printf "Push results to GitHub? [y/N] "
+read _push_ans
+case "$_push_ans" in
+    y|Y|yes|YES)
+        TOKEN=$(grep "^GITHUB_TOKEN=" /afs/apd.pok.ibm.com/u/imranyou/.github_token 2>/dev/null | cut -d= -f2)
+        if [ -z "$TOKEN" ]; then
+            echo "ERROR: GITHUB_TOKEN not found in ~/.github_token" >&2
+            exit 1
+        fi
+        REMOTE="https://${TOKEN}@github.com/Imran-younus/ppg-results.git"
+        cd "$SCRIPTDIR" || exit 1
+        echo "Staging files for commit..."
+        git add index.html ppg_results.html "$RESULT_FILE" NOTES.md 2>/dev/null
+        [ -f "$SCRIPTDIR/chain_results_${MODEL_NAME}.txt" ] && git add "$SCRIPTDIR/chain_results_${MODEL_NAME}.txt" 2>/dev/null
+        git commit -m "Add ${MODEL_NAME} results ($(date '+%Y-%m-%d'))" 2>/dev/null || echo "(nothing new to commit)"
+        echo "Pushing to GitHub..."
+        if git push "$REMOTE" main; then
+            echo "Push successful."
+        else
+            echo "Push rejected (remote has diverged). Attempting rebase pull..."
+            git pull "$REMOTE" main --rebase && git push "$REMOTE" main \
+                || { echo "ERROR: push failed after rebase. Resolve manually." >&2; exit 1; }
+        fi
+        ;;
+    *)
+        echo "Skipping GitHub push. Run manually when ready:"
+        echo "  TOKEN=\$(grep '^GITHUB_TOKEN=' /afs/apd.pok.ibm.com/u/imranyou/.github_token | cut -d= -f2)"
+        echo "  git push \"https://\${TOKEN}@github.com/Imran-younus/ppg-results.git\" main"
+        ;;
+esac

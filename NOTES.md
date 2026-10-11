@@ -262,3 +262,214 @@ All standard cell simulations across any model version are driven by the unified
    - **Concise Comments:** Add brief, actionable comments explaining interface and non-obvious steps.
    - **Zero Hardcoded Paths in Libs:** Keep model paths in environment variables or caller scripts.
    - **Automated Validation:** Always run `verify_dataset_consistency.js` before staging and pushing.
+
+---
+
+## 11. Post-Refactor Regression Test: 7TSL_INV @ 0.70V, 25C
+
+**Run after every code reorganisation or refactor of `run_ppg_sim.sh` / `ppg_sim_lib.sh`.**
+
+```sh
+ksh regression_7TSL_INV.sh
+# Expected: 10/10 PASS, exit code 0
+```
+
+The script reads existing `.lis` files from `run_vdd_{MODEL}_slvt/0_7/7TSL_INV/invfo3_mod.sp.lis` — no new simulations are submitted. It uses `node` for floating-point comparison with a 0.01% pass threshold.
+
+**Reference values (from `index.html`, VDD index 4 = 0.70V, 25C, SLVT):**
+
+| Metric | v0.6SB | v0.6SB2 |
+|---|---|---|
+| stage_delay (ps) | 6.85628 | 6.33879 |
+| iddq (A) | 1.25955e-08 | 1.26121e-08 |
+| iddarail_qcorr (A) | 5.35584e-04 | 5.76559e-04 |
+| acceffrail_qcorr (F) | 5.24615e-15 | 5.22122e-15 |
+| acreffrail_qcorr (Ω) | 1.30692e+03 | 1.21404e+03 |
+
+**Validated 2025-07:** refactored `run_ppg_sim.sh` → 10/10 PASS, 0.000000% delta on all metrics.
+
+**If FAIL:** check Issues 6 (model patch), 5 (SPF terminal order), 3 (no `local`).
+
+---
+
+## 12. Fresh-Simulation Regression: 7TSL_INV @ 0.70V, 25C
+
+**Run after any refactor.** Submits new LSF jobs — does NOT read existing `.lis` files.
+
+```sh
+ksh regression_7TSL_INV_fresh.sh
+# Expected: 10/10 PASS, exit code 0  (~2-3 min)
+```
+
+**Pipeline exercised:** `patch_netlist → process_spf_slvt → create_hsp_wrapper → bsub → wait → collect → compare`
+
+**Run directory:** `regression_run_7TSL_INV/` (wiped and rebuilt each run)
+
+**Sandbox paths (verified 2025-07):**
+- v0.6SB → `Spice-260724-sandbox/` for both `.inc` and `.lib`
+- v0.6SB2 → `Spice-260604-sandbox/` for both `.inc` and `.lib`
+
+**Reference values @ 0.70V, 25C, SLVT (from `index.html` VDD index 4):**
+
+| Metric | v0.6SB | v0.6SB2 |
+|---|---|---|
+| stage_delay (ps) | 6.85628 | 6.33879 |
+| iddq (A) | 1.25955e-08 | 1.26121e-08 |
+| iddarail_qcorr (A) | 5.35584e-04 | 5.76559e-04 |
+| acceffrail_qcorr (F) | 5.24615e-15 | 5.22122e-15 |
+| acreffrail_qcorr (Ω) | 1.30692e+03 | 1.21404e+03 |
+
+**Validated (2025-07, LSF jobs 40337941/40337942):** 10/10 PASS, 0.000000% delta.
+
+**If FAIL:** check Issues 6 (model patch), 5 (SPF terminal order), 3 (no `local`); also verify `DEFAULT_SPFDIR` is mounted and `bsub` is available.
+
+---
+
+## 13. Directory Cleanup Rules (Post-Run Maintenance)
+
+### Safe-to-delete after any completed VDD sweep
+
+```sh
+# Verify .lis count first (must be 336 for a full 24-cell × 14-VDD run)
+find run_vdd_<MODEL>_slvt -name "*.sp.lis" | wc -l
+
+# Then delete HSPICE binary outputs (not needed once .lis is extracted)
+find run_vdd_<MODEL>_slvt -name "*.dp0" -o -name "*.ic0" -o -name "*.ic0@0" \
+  -o -name "*.tr0" -o -name "*.mt0" -o -name "*.pa0" | xargs rm -f
+find run_vdd_<MODEL>_slvt -name "*parseonly*" -delete
+```
+
+### Never delete
+- `*.sp.lis`, `*_dp.lis` — simulation results, primary data source
+- `invfo3_base.sp`, `invfo3_mod.sp` — base and reference netlists
+- `PPGRO_chain_menu14_*.txt`, `chain_results_*.txt` — reference results
+- `index.html`, `ppg_results.html` — website assets
+- `run_ppg_sim.sh`, `ppg_sim_lib.sh`, `hsp_2022_new` — simulation pipeline
+
+### Before deleting any run_vdd_* directory: confirm it's a duplicate
+```sh
+for cell in 7TSL_INV 6TSL_INV 8TSL_NAND2B; do
+  r1=$(grep "stage_delay=" run_vdd_OLD/0_7/${cell}/invfo3_mod.sp.lis 2>/dev/null | awk '{print $NF}')
+  r2=$(grep "stage_delay=" run_vdd_CANONICAL/0_7/${cell}/invfo3_mod.sp.lis 2>/dev/null | awk '{print $NF}')
+  [ "$r1" = "$r2" ] && echo "MATCH $cell" || echo "DIFFER $cell — do NOT delete"
+done
+```
+
+### Ephemeral: always safe to delete
+- `regression_run_7TSL_INV/` — rebuilt by `regression_7TSL_INV_fresh.sh`
+- Root-level `invfo3_mod.mt0`, `invfo3_mod.pa0`, `invfo3_mod.st0`, `PPGchain.spf` — orphan outputs from interactive runs
+
+### Disk impact (2025-07 cleanup): 6.8 GB → 849 MB (~6.1 GB freed)
+
+---
+
+## 14. Debugging Capability Audit After Cleanup
+
+**Confirmed (2025-07):** No deleted file removes a debugging path. All failures are diagnosable from retained files.
+
+### Files retained per cell (full debug capability)
+
+| File | What it provides |
+|---|---|
+| `invfo3_mod.sp` | Patched netlist — re-runnable, shows active `.inc`/`.lib`, PVDD, TEMP |
+| `invfo3_mod.sp.lis` | **Primary debug source** — all `.MEASURE` pass/fail, exact warning messages + line numbers, `power_supply=` |
+| `invfo3_mod.st0` | License checkout, tool version, all `init/dcop/tran` phase timings, `tot_iter`, `peak memory` — convergence diagnosis |
+| `invfo3_mod_dp.lis` | DP-ignored confirmation (expected artefact — Issue 2) |
+| `PPGchain.spf` | Processed SPF — check `.SUBCKT` terminal order for Issue 5 failures |
+| `run_hsp.sh` | Exact re-runnable invocation with hardcoded license |
+
+### Deleted types: why they are NOT needed
+
+- `*.dp0` — DP always ignored (Issue 2), file is header-only
+- `*.ic0/ic0@0` — Not relevant to any known failure class; regenerable
+- `*.tr0` — Waveform binary; **regenerable**: `cd <cell> && ksh run_hsp.sh`
+- `*.mt0` — Binary duplicate of `.sp.lis` measurements
+- `*.pa0` — PVDD in `.sp` and `.sp.lis`; options in `.st0`
+
+### Known open failure (SPF terminal order bug — Issue 5)
+
+`7TSL_AOI21`, `7TSL_OAI21`, `7TSL_OAI22` in `run_vdd_v0p6SB2_slvt` show `stage_delay=failed`. Diagnosed from retained SPF files:
+
+```sh
+grep -i "^\.SUBCKT" run_vdd_v0p6SB2_slvt/0_7/7TSL_AOI21/PPGchain.spf
+# VDD Z A VSS ← wrong; process_spf_slvt was not applied to this run
+```
+
+Fix on next run: `run_ppg_sim.sh` calls `process_spf_slvt` and will correct this.
+
+### Debug checklist
+
+1. `grep -E "failed|WARNING|ERROR|abort" <cell>/invfo3_mod.sp.lis`
+2. `grep "^\.SUBCKT" <cell>/PPGchain.spf` — must end in `VSS VDD A Z`
+3. `grep "^\.inc\|^\.lib" <cell>/invfo3_mod.sp | grep -v spf` — same sandbox?
+4. `cat <cell>/run_hsp.sh` — `LM_LICENSE_FILE` hardcoded?
+5. `grep -E "dcop|tran:|convergence" <cell>/invfo3_mod.st0`
+6. Waveforms: `cd <cell> && ksh run_hsp.sh` to regenerate `.tr0`
+
+---
+
+## Issue 17 — No Chain Data: Dataset Registration & Website Rules
+
+**Date:** 2025-07
+
+### Rule: Never register chain_meta/chain_cells without completed chain sims
+
+When adding a new model to `index.html` or `ppg_results.html`, omit `chain_meta` and
+`chain_cells` entirely from the `registerDataset()` call if chain simulations have not
+been run yet for that model. Only single-stage VDD sweep data should be registered.
+
+**Correct pattern (chain sims pending):**
+```js
+registerDataset({
+  id:    'v0p43_SLVT_TT',
+  name:  'v0.43 (SpiceModel_V0.430)',
+  model: 'v0.43 (SpiceModel_V0.430)',
+  ...
+  // chain_meta and chain_cells omitted — chain sims not yet run
+});
+```
+
+**Wrong pattern (do NOT do this):**
+```js
+registerDataset({
+  ...
+  chain_meta: { ... },   // ← WRONG: fabricating chain data
+  chain_cells: [ ... ],  // ← WRONG: no real chain results exist
+});
+```
+
+### Website behaviour when chain_cells is absent
+
+Both `index.html` and `ppg_results.html` automatically:
+- Hide chain page options (② Chain, ③ Raw Totals / ③ Chain, ④ Comparison) from the
+  page dropdown when the active model has no `chain_cells`
+- Redirect to the single-stage sweep page if a chain page is somehow selected
+- Never crash on missing `chain_meta` (all `chain_meta.xxx` accesses use `cm.xxx||fallback`)
+
+### When chain sims complete for a model
+
+1. Run chain jobs via `full_dut/PPGRO_DUT_7TINVNANDNOR_menu_sweep_...`
+2. Collect with `MODEL_NAME=<model> ksh collect_chain_and_push.sh`
+   - The push prompt at the end will offer to commit and push results
+3. Add `chain_meta` and `chain_cells` to the existing `registerDataset()` call
+4. Run `node verify_dataset_consistency.js index.html ppg_results.html` — must be all ✅
+5. Push to GitHub
+
+### GitHub push prompt (collect_chain_and_push.sh)
+
+After successful validation, `collect_chain_and_push.sh` now prompts:
+```
+Push results to GitHub? [y/N]
+```
+Answering `y` stages `index.html`, `ppg_results.html`, the result file, and `NOTES.md`,
+commits with a dated message, and pushes using the token in `~/.github_token`.
+Answering `n` prints the manual push command and exits cleanly.
+
+### Model name display convention
+
+All model `name` fields in `registerDataset()` must include the sandbox identifier:
+```js
+name: 'v0.6SB2 (Spice-260604-sandbox)'   // ✅ correct
+name: 'v0.6SB'                             // ✗ ambiguous — do not use
+```
+This ensures the model dropdown in the website clearly identifies each model version.
