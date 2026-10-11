@@ -25,6 +25,7 @@
 #   -f, --flavor       Vt flavor: "slvt" (default) or "ulvt"
 #   -o, --output       Output results file path (optional)
 #   -d, --dry-run      Generate netlists/wrappers without submitting LSF jobs
+#   -c, --collect-only Collect results from existing .sp.lis files; skip setup/submit/wait
 #=============================================================================
 
 SCRIPTDIR=$(cd "$(dirname "$0")" && pwd)
@@ -32,6 +33,7 @@ SCRIPTDIR=$(cd "$(dirname "$0")" && pwd)
 
 # ── Parse CLI arguments (overrides env vars) ────────────────────────
 DRY_RUN=0
+COLLECT_ONLY=0
 while [ $# -gt 0 ]; do
     case "$1" in
         -m|--model-name) MODEL_NAME="$2"; shift 2 ;;
@@ -42,6 +44,7 @@ while [ $# -gt 0 ]; do
         -f|--flavor)     VT="$2";         shift 2 ;;
         -o|--output)     OUTPUT="$2";     shift 2 ;;
         -d|--dry-run)    DRY_RUN=1;       shift 1 ;;
+        -c|--collect-only) COLLECT_ONLY=1; shift 1 ;;
         -h|--help)
             echo "Usage: ksh run_ppg_sim.sh [options]"
             echo "Options:"
@@ -53,6 +56,7 @@ while [ $# -gt 0 ]; do
             echo "  -f, --flavor     <flavor> 'slvt' (default) or 'ulvt'"
             echo "  -o, --output     <path>   Output results file"
             echo "  -d, --dry-run             Prepare files without LSF submit"
+            echo "  -c, --collect-only        Collect from existing .sp.lis; skip setup/submit/wait"
             exit 0
             ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
@@ -60,7 +64,10 @@ while [ $# -gt 0 ]; do
 done
 
 # ── Defaults & Configuration ────────────────────────────────────────
-validate_model_params
+# collect-only mode: MODEL_INC/LIB not needed — skip validation
+if [ "$COLLECT_ONLY" -eq 0 ]; then
+    validate_model_params
+fi
 
 VT="${VT:-slvt}"
 TEMP="${TEMP:-$DEFAULT_TEMP}"
@@ -93,8 +100,13 @@ echo "======================================================"
 
 mkdir -p "$RUNDIR"
 
-# ── Submit Simulations ──────────────────────────────────────────────
+# ── Submit Simulations (skipped in collect-only mode) ───────────────
+if [ "$COLLECT_ONLY" -eq 1 ]; then
+    echo "(collect-only: skipping netlist setup and job submission)"
+fi
+
 for vdd in $VOLTAGES; do
+    [ "$COLLECT_ONLY" -eq 1 ] && break   # skip entire setup/submit loop
     vdd_tag=$(echo "$vdd" | sed 's/\./_/g')
     vdd_dir="$RUNDIR/$vdd_tag"
     mkdir -p "$vdd_dir"
@@ -143,8 +155,10 @@ if [ "$DRY_RUN" -eq 1 ]; then
     exit 0
 fi
 
-# ── Wait for Completion ─────────────────────────────────────────────
-wait_for_jobs "$LSF_JOBPREFIX"
+# ── Wait for Completion (skipped in collect-only mode) ──────────────
+if [ "$COLLECT_ONLY" -eq 0 ]; then
+    wait_for_jobs "$LSF_JOBPREFIX"
+fi
 
 # ── Collect Results ─────────────────────────────────────────────────
 printf "" > "$RESULTS"
