@@ -220,9 +220,9 @@ footer{border-top:1px solid var(--border);margin-top:40px;padding-top:12px;text-
 
 <!-- Section 3: TSL gain vs VDD -->
 <section>
-  <div class="section-title"><span class="bar"></span><span id="gain-title">TSL Speed Gain vs 6TSL Baseline — Across VDD Range</span></div>
+  <div class="section-title"><span class="bar"></span><span id="gain-title">TSL Speed Gain — 7TSL &amp; 8TSL vs 6TSL</span></div>
   <div class="info-box">
-    Shows how much faster 7TSL and 8TSL are vs the 6TSL baseline for each cell type, plotted across the full VDD sweep.
+    Shows how much faster 7TSL and 8TSL are vs 6TSL for each cell type, plotted across the full VDD sweep.
     The advantage is larger at low VDD — 8TSL vs 6TSL INV gain is ~23% at 0.5 V but only ~13% at 1.15 V.
   </div>
   <div class="chart-card wide"><canvas id="gainSweepChart" height="80"></canvas></div>
@@ -478,12 +478,6 @@ footer{border-top:1px solid var(--border);margin-top:40px;padding-top:12px;text-
     <span id="cmp-cell-row" style="display:inline-flex;flex-wrap:wrap;gap:4px"></span>
   </div>
   <div class="chart-card wide"><canvas id="cmpBarChart" height="90"></canvas></div>
-</section>
-
-<section>
-  <div class="section-title"><span class="bar"></span>Δ% vs Baseline Model</div>
-  <div class="info-box" id="cmp-baseline-label"></div>
-  <div class="chart-card wide"><canvas id="cmpDeltaChart" height="75"></canvas></div>
 </section>
 
 <section>
@@ -1215,7 +1209,7 @@ let sweepObj=null,gainSweepObj=null,barObj=null,fomObj=null,
     chainDelayObj=null,chainCeffObj=null,chainAcreffObj=null,chainIddqObj=null,
     corrBarDelay=null,corrBarCeff=null,corrBarAcreff=null,corrPctObj=null,
     corrScDelay=null,corrScCeff=null;
-let cmpBarObj=null,cmpDeltaObj=null,cmpChainObjs=[];
+let cmpBarObj=null,cmpChainObjs=[];
 let chainBuilt=false,topoBuilt=false,cmpBuilt=false;
 
 // ── Model Comparison state ──────────────────────────────────────────
@@ -1303,12 +1297,12 @@ function destroyAllCharts(){
   [sweepObj,gainSweepObj,barObj,fomObj,tradeObj,trade2Obj,
    chainDelayObj,chainCeffObj,chainAcreffObj,chainIddqObj,
    corrBarDelay,corrBarCeff,corrBarAcreff,corrPctObj,corrScDelay,corrScCeff,
-   cmpBarObj,cmpDeltaObj,...cmpChainObjs
+   cmpBarObj,...cmpChainObjs
   ].forEach(c=>{if(c)c.destroy();});
   sweepObj=gainSweepObj=barObj=fomObj=tradeObj=trade2Obj=null;
   chainDelayObj=chainCeffObj=chainAcreffObj=chainIddqObj=null;
   corrBarDelay=corrBarCeff=corrBarAcreff=corrPctObj=corrScDelay=corrScCeff=null;
-  cmpBarObj=cmpDeltaObj=null;cmpChainObjs=[];
+  cmpBarObj=null;cmpChainObjs=[];
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1648,10 +1642,10 @@ function buildGainSweepChart(){
         borderWidth:1.5,borderDash:dash,pointRadius:0,pointHoverRadius:4});
     });
   });
-  const opts=gridOpts('VDD (V)',`Stage Delay Gain vs ${base} Baseline (%)`);
+  const opts=gridOpts('VDD (V)',`Stage Delay Gain — ${base} reference (%)`);
   opts.plugins.tooltip={callbacks:{title:i=>'VDD = '+i[0].label+'V',label:i=>i.dataset.label+': +'+i.raw.toFixed(1)+'%'}};
   if(gainSweepObj){gainSweepObj.destroy();}
-  document.getElementById('gain-title').textContent=`TSL Speed Gain vs ${base} Baseline — Across VDD Range`;
+  document.getElementById('gain-title').textContent=`TSL Speed Gain — 7TSL & 8TSL vs ${base}`;
   gainSweepObj=new Chart(document.getElementById('gainSweepChart'),{type:'line',
     data:{labels:vddArr.map(v=>v+'V'),datasets},options:opts});
 }
@@ -2162,7 +2156,7 @@ function renderCmpPage(){
   chainSec.style.display=chainModels.length>=2?'':'none';
   if(chainModels.length>=2){
     document.getElementById('cmp-chain-info').textContent=
-      `Comparing 101-stage chain per-stage values across ${chainModels.length} models with chain data: ${chainModels.map(m=>m.name).join(', ')}. Baseline = ${chainModels[0].name}.`;
+      `Comparing 101-stage chain per-stage values across ${chainModels.length} models with chain data: ${chainModels.map(m=>m.name).join(', ')}.`;
     const cmRow=document.getElementById('cmp-chain-metric-row');
     if(!cmRow.children.length){
       const CHAIN_METRICS={stage_delay:'Stage Delay (ps)',acceff:'ACCeff/Ceff (fF)',acreff:'ACReff (Ω)',iddq:'IDDQ (nA/stage)'};
@@ -2187,8 +2181,6 @@ function cmpRenderCharts(){
   const metric=cmpMetric;
   const sc=METRICS_SCALE[metric]||1;
   const lbl=METRICS_LABEL[metric];
-  const baseMd=models[0];
-
   const visCells=allCells.filter(c=>{
     const tsl=c.slice(0,4);const ct=c.slice(5);
     return CMP_TSL_SHOW[tsl]!==false && CMP_CELL_SHOW[ct]!==false;
@@ -2216,36 +2208,6 @@ function cmpRenderCharts(){
            title:{display:true,text:lbl,color:'#7a85a0',font:{size:10}}}}}
   });
 
-  // ── Δ% chart vs baseline ───────────────────────────────────────
-  document.getElementById('cmp-baseline-label').textContent=
-    `Baseline: ${baseMd.name}  ·  Positive Δ% = slower/larger  ·  Negative Δ% = faster/smaller`;
-  if(cmpDeltaObj){cmpDeltaObj.destroy();cmpDeltaObj=null;}
-  if(models.length>1){
-    cmpDeltaObj=new Chart(document.getElementById('cmpDeltaChart'),{
-      type:'bar',
-      data:{
-        labels:visCells,
-        datasets:models.slice(1).map((md,mi)=>({
-          label:md.name+' vs '+baseMd.name,
-          backgroundColor:cmpModelColor(mi+1)+'cc',
-          borderColor:cmpModelColor(mi+1),
-          borderWidth:1,
-          data:visCells.map(c=>{
-            const vb=baseMd.data[c]?.[metric]?.[vi];const vt=md.data[c]?.[metric]?.[vi];
-            if(vb==null||vt==null||vb===0) return null;
-            return +((vt-vb)/vb*100).toFixed(2);
-          })
-        }))
-      },
-      options:{responsive:true,animation:false,
-        plugins:{legend:{labels:{color:'#7a85a0',font:{size:11},boxWidth:12}},
-          tooltip:{callbacks:{label:i=>`${i.dataset.label}: ${i.raw!=null?i.raw.toFixed(2)+'%':'—'}`}}},
-        scales:{x:{ticks:{color:'#7a85a0',font:{size:9},maxRotation:50},grid:{color:'#1c2030'}},
-          y:{ticks:{color:'#7a85a0',font:{size:10},callback:v=>v.toFixed(1)+'%'},grid:{color:'#1c2030'},
-             title:{display:true,text:'Δ% vs '+baseMd.name,color:'#7a85a0',font:{size:10}}}}}
-    });
-  }
-
   cmpRenderTable(visCells);
   cmpRenderChainSection();
   cmpRenderObservations(models,visCells,vi);
@@ -2262,24 +2224,14 @@ function cmpRenderTable(visCells){
   const thead=document.getElementById('cmp-thead');
   const tbody=document.getElementById('cmp-tbody');
   thead.innerHTML='<tr><th>TSL</th><th>Cell</th>'+
-    models.map((md,mi)=>`<th style="text-align:right;color:${cmpModelColor(mi)}">${md.name}</th>`).join('')+
-    (models.length>1?models.slice(1).map((md,mi)=>`<th style="text-align:right;color:${cmpModelColor(mi+1)}">Δ% vs base</th>`).join(''):'')+'</tr>';
+    models.map((md,mi)=>`<th style="text-align:right;color:${cmpModelColor(mi)}">${md.name}</th>`).join('')+'</tr>';
   tbody.innerHTML=visCells.map(c=>{
     const tsl=c.slice(0,4);const ct=c.slice(5);
     const vals=models.map(md=>md.data[c]?.[metric]?.[vi]);
-    const base=vals[0];
-    const deltaCells=models.slice(1).map((_,mi)=>{
-      const v=vals[mi+1];
-      if(base==null||v==null||base===0) return '<td class="mono" style="text-align:right">—</td>';
-      const pct=((v-base)/base*100);
-      const col=pct>5?'#ff6b35':pct<-5?'#00ff9f':'#7a85a0';
-      return `<td class="mono" style="text-align:right;color:${col}">${pct>0?'+':''}${pct.toFixed(2)}%</td>`;
-    });
     return `<tr>
       <td><span class="chip chip${parseInt(tsl)}">${tsl}</span></td>
       <td style="font-size:12px">${ct}</td>
       ${vals.map(v=>`<td class="mono" style="text-align:right">${v!=null?fmtVal(v,metric):'—'}</td>`).join('')}
-      ${deltaCells.join('')}
     </tr>`;
   }).join('');
 }
@@ -2292,15 +2244,9 @@ function cmpRenderChainSection(){
   const sc=METRICS_SCALE[metric]||1;
   const lbl=METRICS_LABEL[metric];
   const allChainCells=cmpGetAllChainCells();
-  const baseMd=chainModels[0];
   const container=document.getElementById('cmp-chain-charts');
   const barId='cmpChainBar';
-  const deltaId='cmpChainDelta';
-  container.innerHTML=`
-    <div class="chart-card wide"><canvas id="${barId}" height="80"></canvas></div>
-    ${chainModels.length>1?`<div style="font-size:10px;color:#57606a;margin:6px 0 2px">Δ% vs baseline chain (${baseMd.name})</div>
-    <div class="chart-card wide"><canvas id="${deltaId}" height="55"></canvas></div>`:''}
-  `;
+  container.innerHTML=`<div class="chart-card wide"><canvas id="${barId}" height="80"></canvas></div>`;
   // chain_cells values are already in display units (ps, fF, KΩ, nA) — no scale multiplication
   // chainKey maps UI metric name to field name in chain_cells objects
   const chainKey={stage_delay:'stage_delay',acceff:'ceff',acreff:'acreff',iddq:'iddq'}[metric]||metric;
@@ -2324,49 +2270,14 @@ function cmpRenderChainSection(){
            title:{display:true,text:lbl+' ('+chainUnit+')',color:'#7a85a0',font:{size:10}}}}}
   });
   cmpChainObjs.push(barObj);
-  if(chainModels.length>1){
-    const datasets_delta=chainModels.slice(1).map((md,mi)=>({
-      label:md.name+' vs '+baseMd.name,
-      backgroundColor:cmpModelColor(mi+1)+'cc',
-      borderColor:cmpModelColor(mi+1),
-      borderWidth:1,
-      data:allChainCells.map(c=>{
-        const vb=chainVal(baseMd,c,chainKey);
-        const vt=chainVal(md,c,chainKey);
-        if(vb==null||vt==null||vb===0) return null;
-        return +((vt-vb)/vb*100).toFixed(2);
-      })
-    }));
-    const dObj=new Chart(document.getElementById(deltaId),{
-      type:'bar',
-      data:{labels:allChainCells,datasets:datasets_delta},
-      options:{responsive:true,animation:false,
-        plugins:{legend:{labels:{color:'#7a85a0',font:{size:11},boxWidth:12}},
-          tooltip:{callbacks:{label:i=>`${i.dataset.label}: ${i.raw!=null?i.raw.toFixed(2)+'%':'—'}`}}},
-        scales:{x:{ticks:{color:'#7a85a0',font:{size:9},maxRotation:50},grid:{color:'#1c2030'}},
-          y:{ticks:{color:'#7a85a0',font:{size:10},callback:v=>v.toFixed(1)+'%'},grid:{color:'#1c2030'},
-             title:{display:true,text:'Δ% chain per-stage vs '+baseMd.name,color:'#7a85a0',font:{size:10}}}}}
-    });
-    cmpChainObjs.push(dObj);
-  }
   const thead=document.getElementById('cmp-chain-thead');
   const tbody=document.getElementById('cmp-chain-tbody');
   thead.innerHTML='<tr><th>Cell</th>'+
-    chainModels.map((md,mi)=>`<th style="text-align:right;color:${cmpModelColor(mi)}">${md.name}</th>`).join('')+
-    (chainModels.length>1?chainModels.slice(1).map((md,mi)=>`<th style="text-align:right;color:${cmpModelColor(mi+1)}">Δ% vs base</th>`).join(''):'')+'</tr>';
+    chainModels.map((md,mi)=>`<th style="text-align:right;color:${cmpModelColor(mi)}">${md.name}</th>`).join('')+'</tr>';
   tbody.innerHTML=allChainCells.map(c=>{
     const vals=chainModels.map(md=>chainVal(md,c,chainKey));
-    const base=vals[0];
-    const deltaCells=chainModels.slice(1).map((_,mi)=>{
-      const v=vals[mi+1];
-      if(base==null||v==null||base===0) return '<td class="mono" style="text-align:right">—</td>';
-      const pct=((v-base)/base*100);
-      const col=pct>5?'#ff6b35':pct<-5?'#00ff9f':'#7a85a0';
-      return `<td class="mono" style="text-align:right;color:${col}">${pct>0?'+':''}${pct.toFixed(2)}%</td>`;
-    });
     return `<tr><td style="font-size:12px">${c}</td>
       ${vals.map(v=>`<td class="mono" style="text-align:right">${v!=null?v.toFixed(3)+' '+chainUnit:'—'}</td>`).join('')}
-      ${deltaCells.join('')}
     </tr>`;
   }).join('');
 }
@@ -2378,25 +2289,11 @@ function cmpRenderObservations(models,visCells,vi){
     return;
   }
   const metric=cmpMetric||'stage_delay';
-  const sc=METRICS_SCALE[metric]||1;
   const lbl=METRICS_LABEL[metric];
-  const baseMd=models[0];
-
-  const modelDeltas=models.slice(1).map(md=>({
-    name:md.name,
-    deltas:visCells.map(c=>{
-      const vb=baseMd.data[c]?.[metric]?.[vi];
-      const vc=md.data[c]?.[metric]?.[vi];
-      if(vb==null||vc==null||vb===0) return null;
-      return (vc-vb)/vb*100;
-    }).filter(x=>x!=null)
-  }));
 
   function avg(arr){return arr.length?+(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(2):null;}
-  function rng(arr){return arr.length?`${Math.min(...arr).toFixed(1)}% to ${Math.max(...arr).toFixed(1)}%`:'—';}
-  function sign(v){return v>0?'larger/slower than':'smaller/faster than';}
 
-  // Find fastest model per cell and most consistent model
+  // Count cells where each model is lowest (best) for selected metric
   const winCount={};
   models.forEach(md=>{winCount[md.name]=0;});
   visCells.forEach(c=>{
@@ -2408,57 +2305,25 @@ function cmpRenderObservations(models,visCells,vi){
     });
     if(bestMd) winCount[bestMd]=(winCount[bestMd]||0)+1;
   });
-  const winnerName=Object.entries(winCount).sort((a,b)=>b[1]-a[1])[0]?.[0]||baseMd.name;
+  const winnerName=Object.entries(winCount).sort((a,b)=>b[1]-a[1])[0]?.[0]||models[0].name;
   const winnerCount=winCount[winnerName];
 
-  const tslDeltas={};
-  visCells.forEach(c=>{
-    const tsl=c.slice(0,4);
-    const vb=baseMd.data[c]?.[metric]?.[vi];
-    models.slice(1).forEach(md=>{
-      const vc=md.data[c]?.[metric]?.[vi];
-      if(vb==null||vc==null||vb===0) return;
-      if(!tslDeltas[tsl]) tslDeltas[tsl]=[];
-      tslDeltas[tsl].push((vc-vb)/vb*100);
-    });
-  });
-  const ctDeltas={};
-  visCells.forEach(c=>{
-    const ct=c.slice(5);
-    const vb=baseMd.data[c]?.[metric]?.[vi];
-    models.slice(1).forEach(md=>{
-      const vc=md.data[c]?.[metric]?.[vi];
-      if(vb==null||vc==null||vb===0) return;
-      if(!ctDeltas[ct]) ctDeltas[ct]=[];
-      ctDeltas[ct].push((vc-vb)/vb*100);
-    });
+  // Per-model average absolute value across visible cells
+  const modelAvgs=models.map(md=>{
+    const vals=visCells.map(c=>md.data[c]?.[metric]?.[vi]).filter(v=>v!=null);
+    return {name:md.name,avg:avg(vals),count:vals.length};
   });
 
-  const biggestTslEntry=Object.entries(tslDeltas).sort((a,b)=>Math.abs(avg(b[1]))-Math.abs(avg(a[1])))[0];
-  const smallestTslEntry=Object.entries(tslDeltas).sort((a,b)=>Math.abs(avg(a[1]))-Math.abs(avg(b[1])))[0];
-  const biggestCtEntry=Object.entries(ctDeltas).sort((a,b)=>Math.abs(avg(b[1]))-Math.abs(avg(a[1])))[0];
-
-  const obs=modelDeltas.map(md=>{
-    const a=avg(md.deltas);const r=rng(md.deltas);
-    return `• ${md.name} is on average ${Math.abs(a).toFixed(2)}% ${sign(a)} ${baseMd.name} for ${lbl} across ${md.deltas.length} cells (range: ${r}).`;
-  }).join('\n');
+  const obs=modelAvgs.map(m=>`• ${m.name}: avg ${lbl} = ${m.avg!=null?m.avg.toFixed(3):'—'} across ${m.count} cells`).join('\n');
   document.getElementById('cmp-obs').textContent=obs;
 
-  const tslLine=biggestTslEntry?`${biggestTslEntry[0]} shows the largest average difference (${avg(biggestTslEntry[1]).toFixed(2)}%)`:'';
-  const ctLine=biggestCtEntry?`${biggestCtEntry[0]} cells show the largest average delta (${avg(biggestCtEntry[1]).toFixed(2)}%)`:'';
-  const consistencyLine=modelDeltas.map(md=>{
-    const spread=md.deltas.length>1?Math.max(...md.deltas)-Math.min(...md.deltas):0;
-    const a=avg(md.deltas);
-    const sys=spread<5?' — highly consistent (< 5% spread, topology-independent process change)':` — cell-dependent (${spread.toFixed(1)}% spread, possibly layout or topology sensitive)`;
-    return `<li><strong>${md.name} vs ${baseMd.name}:</strong> avg ${lbl} delta ${a!=null?(a>0?'+':'')+a.toFixed(2)+'%':'—'}${sys}. Best on ${winCount[md.name]||0}/${visCells.length} cells.</li>`;
-  }).join('');
+  const rankLine=modelAvgs.slice().sort((a,b)=>a.avg-b.avg).map((m,i)=>`${i+1}. ${m.name}`).join(' &lt; ');
 
   document.getElementById('cmp-takeaway-list').innerHTML=`
-    <li><strong>Best ${lbl} across most cells: ${winnerName}</strong> (wins ${winnerCount}/${visCells.length} cells at VDD=${cmpGetVddList()[vi]||'?'}V). Lower is better for all metrics.</li>
-    ${tslLine?`<li><strong>TSL sensitivity:</strong> ${tslLine}. ${smallestTslEntry&&smallestTslEntry[0]!==biggestTslEntry[0]?smallestTslEntry[0]+' shows the smallest delta ('+avg(smallestTslEntry[1]).toFixed(2)+'%).':''}</li>`:''}
-    ${ctLine?`<li><strong>Cell-type sensitivity:</strong> ${ctLine}. Complex AOI/OAI cells typically amplify process differences vs inverters.</li>`:''}
-    ${consistencyLine}
-    <li><strong>How to interpret Δ%:</strong> Tight spread (&lt;5%) = systematic process shift. Wide spread (&gt;10%) = cell/topology-specific difference — investigate per-cell.</li>`;
+    <li><strong>Best ${lbl} across most cells: ${winnerName}</strong> (lowest value on ${winnerCount}/${visCells.length} cells at VDD=${cmpGetVddList()[vi]||'?'}V). Lower is better for all metrics.</li>
+    <li><strong>Ranking (lowest = fastest/best):</strong> ${rankLine}</li>
+    ${models.map(md=>`<li><strong>${md.name}:</strong> wins ${winCount[md.name]||0}/${visCells.length} cells for ${lbl}.</li>`).join('')}
+    <li><strong>No baseline model has been designated yet.</strong> Designate a baseline to enable Δ% comparison columns.</li>`;
 }
 
 // ═══════════════════════════════════════════════════════════════════
