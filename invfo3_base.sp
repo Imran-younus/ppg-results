@@ -131,7 +131,11 @@
 *.inc '/afs/apd/ant/research/test/2HP/v0.53/Spice-260616-sandbox/design_include.inc'
 *.lib /afs/apd/ant/research/test/2HP/v0.53/Spice-260616-sandbox/fixed_corner.lib TT
 
-.inc Titan_spf' 
+* IIM Mintaka V0.430
+*.inc '/afs/apd/ant/cte_tech/1p4/IIMmintaka/common/pdk/IIM/SpiceModel_V0.430/Hspice/design_include.inc'
+*.lib /afs/apd/ant/cte_tech/1p4/IIMmintaka/common/pdk/IIM/SpiceModel_V0.430/Hspice/fixed_corner.lib TT
+
+.inc Titan_spf'
 
 *.param cov_tune = COVTUNE 
 
