@@ -503,3 +503,77 @@ If these return the correct content → browser cache issue, NOT a code problem.
 **Version stamp maintenance:** Update footer stamp in every commit that adds features:
 - `ppg_results.html`: `v2025-07-<short-hash> · N models · ①②③④`
 - `index.html`:       `v2025-07-<short-hash> · N models · ①②③④⑤`
+
+---
+
+## Issue 19 — LSF Jobs Land on Wrong Nodes: "HSPICE is not supported on linux currently"
+
+**Date:** 2025-10 (v0.53 simulation run)
+
+### Symptom
+All 336 `.sp.lis` files written almost instantly, every one containing only:
+```
+Error : HSPICE is not supported on linux currently.
+```
+No `stage_delay=` results anywhere. `bjobs` shows all jobs DONE before simulations could have run.
+
+### Root cause
+`bsub` was invoked **without** the required LSF resource selector. Jobs dispatched to arbitrary nodes — including compute nodes that do not have the HSPICE binary available or licensed.
+
+The correct selector, defined in `ppg_sim_lib.sh::DEFAULT_LSF_SELECT`, is:
+```
+(osver==rh8) && (type == X86_64) && ! etx && ! nojobs
+```
+
+When `bsub` was called manually (outside `run_ppg_sim.sh`) during the v0.53 token-expiry recovery, the `-R` flag was omitted:
+```sh
+# WRONG — missing -R selector:
+bsub -J "PPGv053_${vdd}_${cell}" -M 128 -n 8 -cwd "$celldir" "ksh run_hsp.sh"
+
+# CORRECT — as used by run_ppg_sim.sh:
+bsub -J "..." -M 128 -n 8 -W 4:00 \
+     -R "select[(osver==rh8) && (type == X86_64) && ! etx && ! nojobs]" \
+     -cwd "$celldir" "ksh run_hsp.sh"
+```
+
+### Why it was missed
+The `.sp.lis` files were created immediately (job "finished"), and the check `find ... -name "*.sp.lis" | wc -l` returned 336 — the expected count. No further content validation was done at that point. The error only became visible when spot-checking the actual file contents.
+
+### Fix
+1. Delete all stale `.sp.lis` files:
+   ```sh
+   find run_vdd_v0.53_slvt -name "*.sp.lis" -delete
+   ```
+2. Resubmit using `run_ppg_sim.sh` (which always includes the correct `-R` selector), **or** manually with the full correct `bsub` flags:
+   ```sh
+   LSF_SELECT='(osver==rh8) && (type == X86_64) && ! etx && ! nojobs'
+   find run_vdd_v0.53_slvt -name "run_hsp.sh" | while read sh; do
+     celldir=$(dirname "$sh")
+     cell=$(basename "$celldir")
+     vdd=$(basename $(dirname "$celldir"))
+     bsub -J "PPGv053_${vdd}_${cell}" -M 128 -n 8 -W 4:00 \
+          -R "select[$LSF_SELECT]" \
+          -cwd "$celldir" "ksh run_hsp.sh"
+   done
+   ```
+
+### Prevention rules (mandatory going forward)
+
+1. **Never call `bsub` manually without `-R "select[$DEFAULT_LSF_SELECT]"`.**  
+   Always copy the selector string from `ppg_sim_lib.sh::DEFAULT_LSF_SELECT`.
+
+2. **After any job batch completes, always validate `.sp.lis` content** — not just count:
+   ```sh
+   # Spot-check 3 cells at one VDD point before declaring success
+   for cell in 7TSL_INV 7TSL_NAND2B 7TSL_NOR2B; do
+     grep "stage_delay=" run_vdd_<MODEL>_slvt/0_7/${cell}/invfo3_mod.sp.lis
+   done
+   ```
+   If any line is empty or contains `Error :`, the run failed.
+
+3. **Prefer `run_ppg_sim.sh` for all submissions** — it embeds the correct `-R` selector, `-W 4:00` wall time, and validated LSF flags. Manual `bsub` loops are only for recovery and must include the full flag set.
+
+4. **When recovering from a failed batch** (e.g. token expiry mid-run), always:
+   - Check which `.sp.lis` files contain actual results vs error messages before deleting anything
+   - Delete only the bad `.sp.lis` files, keeping any good ones
+   - Resubmit only the missing/failed cells, not the whole batch
