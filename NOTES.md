@@ -473,3 +473,33 @@ name: 'v0.6SB2 (Spice-260604-sandbox)'   // ✅ correct
 name: 'v0.6SB'                             // ✗ ambiguous — do not use
 ```
 This ensures the model dropdown in the website clearly identifies each model version.
+
+## Issue 18 — GitHub Pages Browser Cache: "I Don't See the Changes"
+
+**Date:** 2025-07
+**Symptom:** User reports not seeing new pages/features on the live GitHub Pages site after a confirmed push.
+
+**Root cause:** GitHub Pages sets `Cache-Control: max-age=600`. The browser serves the cached version for up to 10 minutes. The push was correct; the code was live; the browser just hadn't refreshed.
+
+**Verification protocol (always do this first):**
+```sh
+# Check live HTML content
+curl -s "https://imran-younus.github.io/ppg-results/ppg_results.html" | grep 'option value='
+
+# Check last-modified timestamp
+curl -sI "https://imran-younus.github.io/ppg-results/ppg_results.html" | grep last-modified
+```
+If these return the correct content → browser cache issue, NOT a code problem.
+
+**Fix (commit c475525):**
+- `<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">` added to both HTML files
+- `<meta http-equiv="Pragma" content="no-cache">` added to both HTML files
+- Version stamp added to footer: `v2025-07-<commit> · N models · page-numbers`
+
+**User fix:** Hard refresh (`Ctrl+Shift+R` / `Cmd+Shift+R`) or open in private/incognito window.
+
+**Rule going forward:** Never diagnose a GitHub push failure based on what the user sees in the browser without first running `curl` to verify the live content.
+
+**Version stamp maintenance:** Update footer stamp in every commit that adds features:
+- `ppg_results.html`: `v2025-07-<short-hash> · N models · ①②③④`
+- `index.html`:       `v2025-07-<short-hash> · N models · ①②③④⑤`
