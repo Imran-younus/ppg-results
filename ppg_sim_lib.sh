@@ -22,6 +22,10 @@ DEFAULT_LSF_SELECT='(osver==rh8) && (type == X86_64) && ! etx && ! nojobs'
 _SUBCKT_SED_1='s/\.SUBCKT \([0-9a-zA-Z*_]*\) Z VDD A VSS/.SUBCKT \1 VSS VDD A Z/g'
 _SUBCKT_SED_2='s/\.SUBCKT \([0-9a-zA-Z*_]*\) VDD Z A VSS/.SUBCKT \1 VSS VDD A Z/g'
 _SUBCKT_SED_3='s/\.SUBCKT \([0-9a-zA-Z*_]*\) A VDD Z VSS/.SUBCKT \1 VSS VDD A Z/g'
+_SUBCKT_SED_4='s/\.SUBCKT \([0-9a-zA-Z*_]*\) Z VSS A VDD/.SUBCKT \1 VSS VDD A Z/g'
+_SUBCKT_SED_5='s/\.SUBCKT \([0-9a-zA-Z*_]*\) A Z VDD VSS/.SUBCKT \1 VSS VDD A Z/g'
+_SUBCKT_SED_6='s/\.SUBCKT \([0-9a-zA-Z*_]*\) VDD Z VSS A/.SUBCKT \1 VSS VDD A Z/g'
+_SUBCKT_SED_7='s/\.SUBCKT \([0-9a-zA-Z*_]*\) VDD VSS A Z/.SUBCKT \1 VSS VDD A Z/g'
 _VT_SED_N='s^.slvtnfet^ ulvtnfet^'
 _VT_SED_P='s^.slvtpfet^ ulvtpfet^'
 
@@ -161,6 +165,10 @@ process_spf() {
     sed -e "$_SUBCKT_SED_1" \
         -e "$_SUBCKT_SED_2" \
         -e "$_SUBCKT_SED_3" \
+        -e "$_SUBCKT_SED_4" \
+        -e "$_SUBCKT_SED_5" \
+        -e "$_SUBCKT_SED_6" \
+        -e "$_SUBCKT_SED_7" \
         -e "$_VT_SED_N"     \
         -e "$_VT_SED_P"     \
         < "$_ps_src" > "$_ps_dst"
@@ -174,6 +182,10 @@ process_spf_slvt() {
     sed -e "$_SUBCKT_SED_1" \
         -e "$_SUBCKT_SED_2" \
         -e "$_SUBCKT_SED_3" \
+        -e "$_SUBCKT_SED_4" \
+        -e "$_SUBCKT_SED_5" \
+        -e "$_SUBCKT_SED_6" \
+        -e "$_SUBCKT_SED_7" \
         < "$_ps_src" > "$_ps_dst"
 }
 

@@ -71,7 +71,11 @@ fi
 
 VT="${VT:-slvt}"
 TEMP="${TEMP:-$DEFAULT_TEMP}"
-SPFDIR="${SPFDIR:-$DEFAULT_SPFDIR}"
+if [ -z "$SPFDIR" ]; then
+    SPFDIR="$DEFAULT_SPFDIR"
+    echo "WARNING: SPFDIR not set - using DEFAULT_SPFDIR (tpdk0.6sb = V0.61 parasitics)." >&2
+    echo "         For TPDK0.53 / RPDK0.43 you MUST export SPFDIR (see SKILL.md model table)." >&2
+fi
 BASESP="$SCRIPTDIR/invfo3_base.sp"
 NETLIST='invfo3_mod.sp'
 SPF_OUT='PPGchain.spf'
@@ -96,7 +100,17 @@ echo "  Temperature : ${TEMP} °C"
 echo "  Voltages    : $VOLTAGES"
 echo "  Run dir     : $RUNDIR"
 echo "  Results out : $RESULTS"
+echo "  SPF dir     : $SPFDIR"
+echo "  SPF TCAD    : $(grep -m1 'TCAD_GRD_FILE' "$SPFDIR/PPG1_INV_X2_7TSL.spf" 2>/dev/null | awk '{print $NF}')"
 echo "======================================================"
+
+# Pre-flight (Issue 21): optional TCAD check. export SPF_TCAD_EXPECT='V0p53' etc.
+if [ "$COLLECT_ONLY" -eq 0 ] && [ -n "$SPF_TCAD_EXPECT" ]; then
+    if ! grep -m1 'TCAD_GRD_FILE' "$SPFDIR/PPG1_INV_X2_7TSL.spf" 2>/dev/null | grep -q "$SPF_TCAD_EXPECT"; then
+        echo "ERROR: SPF TCAD header in $SPFDIR does not contain '$SPF_TCAD_EXPECT'." >&2
+        exit 1
+    fi
+fi
 
 mkdir -p "$RUNDIR"
 
@@ -133,6 +147,18 @@ for vdd in $VOLTAGES; do
             process_spf_slvt "$spf_source" "$cell_rundir/$SPF_OUT"
         fi
 
+        # 3a. Output file must exist (AFS quota exhaustion makes mkdir/redirect fail silently - Issue 28)
+        if [ ! -s "$cell_rundir/$SPF_OUT" ]; then
+            echo "ERROR: could not write $cell_rundir/$SPF_OUT (disk quota? run: fs lq .)" >&2
+            exit 1
+        fi
+        # 3b. Port-order guard (Issue 5/26): processed SPF must be 'VSS VDD A Z'
+        if ! grep -m1 -i '^\.SUBCKT' "$cell_rundir/$SPF_OUT" | grep -q 'VSS VDD A Z[ ]*$'; then
+            echo "ERROR: unknown SPF port order for $label: $(grep -m1 -i '^\.SUBCKT' "$cell_rundir/$SPF_OUT")" >&2
+            echo "       Add a _SUBCKT_SED_n rule in ppg_sim_lib.sh (see SKILL.md Issue 26)." >&2
+            exit 1
+        fi
+
         # 4. Patch per-cell netlist and verify model
         patch_netlist "$TEMPLATE" "$cell_rundir/$NETLIST" "$cell_rundir/$SPF_OUT" "$subckt"
 
@@ -163,6 +189,7 @@ fi
 # ── Collect Results ─────────────────────────────────────────────────
 printf "" > "$RESULTS"
 echo "Collecting results -> $RESULTS"
+rm -f "$RESULTS.missing"
 
 echo "$PPG_STD_CELLS_24" | while read label spf_name subckt; do
     [ -z "$label" ] && continue
@@ -173,6 +200,10 @@ echo "$PPG_STD_CELLS_24" | while read label spf_name subckt; do
             vdd_tag=$(echo "$vdd" | sed 's/\./_/g')
             lis=$(LIS_FILE "$RUNDIR/$vdd_tag/$label/$NETLIST")
             val=$(grep "stage_delay=" "$lis" 2>/dev/null | awk '{print $NF}')
+            case "$val" in
+                [0-9]*) ;;
+                *) echo "MISSING stage_delay: $label @ $vdd V" >> "$RESULTS.missing" ;;
+            esac
             printf "\t%s" "${val:--}"
         done
         printf "\n"
@@ -192,5 +223,12 @@ echo "$PPG_STD_CELLS_24" | while read label spf_name subckt; do
 done
 
 echo ""
-echo "Simulation flow completed successfully."
+if [ -s "$RESULTS.missing" ]; then
+    _n=$(wc -l < "$RESULTS.missing")
+    echo "FAILED: $_n stage_delay value(s) missing/failed. See $RESULTS.missing" >&2
+    echo "Retry only those cells: CELL_FILTER='<labels>' (delete their .lis first). DO NOT publish." >&2
+    exit 1
+fi
+rm -f "$RESULTS.missing"
+echo "Simulation flow completed successfully (all stage_delay values present)."
 echo "Results saved to: $RESULTS"

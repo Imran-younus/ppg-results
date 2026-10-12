@@ -577,3 +577,204 @@ The `.sp.lis` files were created immediately (job "finished"), and the check `fi
    - Check which `.sp.lis` files contain actual results vs error messages before deleting anything
    - Delete only the bad `.sp.lis` files, keeping any good ones
    - Resubmit only the missing/failed cells, not the whole batch
+
+---
+
+## Issue 20 — HTML Changes Not Pushed: "I Don't See the New Model Data on GitHub"
+
+**Date:** 2025-07  
+**Symptom:** User reported v0.53 model data not visible on GitHub Pages site after simulation results were confirmed complete.
+
+**Root cause:** `index.html` and `ppg_results.html` had 141 lines of v0.53 data added each (plus `invfo3_base.sp` model block) in the working tree, but were **never staged or committed**. `git diff --stat HEAD` showed the changes; `git status` showed both files as `modified` (unstaged). GitHub remote had the previous commit.
+
+**Diagnosis:**
+```sh
+git diff --stat HEAD
+# showed: index.html +141 / ppg_results.html +141 / invfo3_base.sp +6
+
+grep -c "v0p53_SLVT_TT" index.html   # → 117  (data IS local)
+curl -s "https://imran-younus.github.io/ppg-results/index.html" | grep -c "v0p53_SLVT_TT"  # → 0 (not on server)
+```
+
+**Fix applied:**
+```sh
+node verify_dataset_consistency.js index.html        # all PASS
+node verify_dataset_consistency.js ppg_results.html  # all PASS
+git add index.html ppg_results.html invfo3_base.sp
+git diff --cached --stat                             # 287 lines confirmed
+git commit -m "Add v0.53 single-stage dataset to both HTML pages + invfo3_base.sp model block"
+TOKEN=$(grep "^GITHUB_TOKEN=" /afs/apd.pok.ibm.com/u/imranyou/.github_token | cut -d= -f2)
+git push "https://${TOKEN}@github.com/Imran-younus/ppg-results.git" main
+# → 2045719..4d47cd3  main -> main  ✅
+```
+
+**Prevention:** After every HTML update, always complete the full trio: `git add` → `git commit` → `git push`. Never stop at "file edited". Run `verify_dataset_consistency.js` before staging. Validate live site with `curl` 60–90 seconds after push.
+
+
+---
+
+## Issue 21 — Wrong SPF directory: right SPICE model + wrong parasitics
+
+**Symptom:** TPDK0.53 and RPDK0.43 single-stage sweeps gave numbers almost identical to v0.6SB (7TSL_INV @0.70V: 6.170 / 6.146 / 6.856 ps).
+**Root cause:** `ppg_sim_lib.sh::DEFAULT_SPFDIR` is `.../SPF_files/tpdk0.6sb` (StarRC TCAD `V0p61_Typical`). `SPFDIR` was never exported for the v0.53 / v0.43 runs, so all 24 `PPGchain.spf` were byte-identical to `tpdk0.6sb` (verified with `cmp` after `process_spf_slvt`). SPICE model changed, parasitics did not.
+**Rule:** Device models come from `MODEL_INC`/`MODEL_LIB`; parasitics come ONLY from the SPF. Every new model run MUST export `SPFDIR` and `SPF_TCAD_EXPECT`.
+**Fix (2025-10):** `run_ppg_sim.sh` now (a) warns loudly if `SPFDIR` is unset, (b) prints the SPF `TCAD_GRD_FILE`, (c) aborts if `SPF_TCAD_EXPECT` is set and not found in that header.
+**Status of published data:** `v0p53_SLVT_TT` and `v0p43_SLVT_TT` in both HTML files were produced with V0.61 parasitics and must be regenerated (use `add_dataset_to_html.py --replace`).
+
+### Authoritative model / SPF table (source: Sbajaj reference sheet, 2HP_Cronus)
+
+| Dataset label | MODEL_INC / MODEL_LIB dir | SPFDIR | `SPF_TCAD_EXPECT` | Notes |
+|---|---|---|---|---|
+| `TPDK0.53 (Spice-V0.51-prod)` | `/afs/apd/ant/research/prod/2HP/V0.51/Spice/` (`design_include.inc`, `fixed_corner.lib`) | `/gpfs/projects/t/titan/dtco/usr/sbajaj/public/for_Imran/SPF_files/tpdk0.53/2HP_Cronus` | `V0p53` | TPDK0.53 uses TPDK0.51 LVS (`prod/2HP/V0.51/ICV/LVS`) and SPICE; PEX = `prod/2HP/V0.53/StarRC/tcad/` |
+| `RPDK0.43 (SpiceModel_V0.430)` | `/afs/apd/ant/cte_tech/1p4/IIMmintaka/common/pdk/IIM/SpiceModel_V0.430/Hspice/` | `/gpfs/projects/t/titan/dtco/usr/sbajaj/public/for_Imran/SPF_files/rpdk0.43/2HP_Cronus` | `V0p42` | RPDK0.43 uses RPDK0.42 PEX (`.../pdk/IIM/StarRC_V0.420/`); LVS = `.../pdk/IIM/ICV_V0.430/LVS/` |
+| `v0.6SB (Spice-260724-sandbox)` | `/afs/apd/ant/research/test/2HP/v0.53/Spice-260724-sandbox/` | `/gpfs/projects/t/titan/dtco/usr/sbajaj/SPF_files/tpdk0.6sb` (= `DEFAULT_SPFDIR`) | `V0p61` | |
+
+Both new SPF folders contain all 24 `PPG1_*` cells and are byte-identical to the older `SPF_files/tpdk0.53` and `SPF_files/rpdk0.43/2HP/ppg_v1` copies (checked on 7TSL_INV). RPDK0.43 SPF header TCAD: `.../RPDK0.43/V43/PEX/StarRC/20M_6Mx_10Dx_2Kx_2Gx_LB/tcad/2HP_RPD_StarRC_..._V0p42_0.nxtgrd`. TPDK0.53: `/afs/apd/ant/research/prod/2HP/V0.53/StarRC/tcad/2HP_V0p53_Typical_16M.nxtgrd`.
+`invfo3_base.sp` already holds commented `.inc/.lib` blocks for both models (paths use the `/afs/apd/...` prefix; `verify_model` is an exact-substring match, so `MODEL_INC` must use that same prefix).
+
+## Issue 22 — `run_ppg_sim.sh` reported success when every job had failed
+
+**Symptom:** "Simulation flow completed successfully." printed with `-` in every result column.
+**Fix (2025-10):** collection now records each non-numeric `stage_delay` in `<results>.missing`; script prints `FAILED: N stage_delay value(s) missing` and exits 1. Never publish when it exits non-zero. Retry only the bad cells: delete their `.sp.lis`, then `CELL_FILTER='7TSL_AOI21 8TSL_NOR2B' ksh run_ppg_sim.sh ...` (same flags, same VDD list). Typical causes: Issue 19 (wrong LSF node), Issue 5 (terminal order -> `stage_delay=failed`), Issue 1 (license).
+
+## Issue 23 — `collect_chain_and_push.sh` is broken for chain runs (OPEN, not fixed)
+
+* Step 3 requires `$MODEL_NAME` to appear inside the `.inc` path; real paths (`Spice-260724-sandbox`, `V0.51/Spice`, ...) never contain `v0.6SB`/`v0.53`, so every run aborts.
+* It truncates the result file before validating (explains empty `chain_results_v0.53.txt`).
+Do not use it for single-stage work. Single-stage collection is built into `run_ppg_sim.sh`.
+
+## Issue 24 — Updating the website from a results file (single-stage)
+
+`add_dataset_to_html.py` (workspace root) does steps 1-2 below for BOTH HTML files:
+```sh
+python3 add_dataset_to_html.py --results PPGRO_chain_menu14_<model>_slvt.txt \
+    --id v0p53_SLVT_TT --name "TPDK0.53 (Spice-V0.51-prod)" --replace     # drop --replace for a new id
+node verify_dataset_consistency.js index.html
+node verify_dataset_consistency.js ppg_results.html
+```
+It refuses incomplete results (`-`/`failed`, !=24 cells x 5 metrics x 14 VDD), refuses names without a `(sandbox/release)` label, never writes `chain_meta`/`chain_cells`, and does not touch git. `--replace` of an unchanged dataset is a byte-for-byte no-op (tested). Results-file rows are: `<cell>`, `<cell>_iddq`, `<cell>_iddarail_qcorr`, `<cell>_acceffrail_qcorr`, `<cell>_acreffrail_qcorr` -> JS metrics `stage_delay, iddq, iddarail, acceff, acreff`.
+After a new model is added also bump the footer `site-version` model count (`N models`) and the model dropdown is automatic. Then follow Issue 20 / "GitHub push procedure" (ask the user before pushing).
+
+## Issue 25 — 101-stage chain topology facts (from the 71.6 MB v0.6.SB chain SPF)
+
+* Ring = 1 enable NAND2 (output net 4; `ENA` on one input, ring feedback net 5 on the other) + 100 inverters = 101 stages (odd, as required). `STAGES=101` in `.measure` is correct.
+* Each ring gate net drives 12 FETs (FO3). A separate 8-FET output buffer (4N+4P, gates on NAND output net 4) drives `OUT`; ~200 more 8-FET gate nets are dummy/tie-off devices.
+* Chain SPF = one whole-ring layout extraction (149k R, 658k C) incl. real inter-stage routing; single-stage SPF (~760 R, 1.7k C) is one cell, stages joined by ideal nodes in `invfo3_base.sp`. This is why chain stage delay is ~2-10% above single-stage.
+* Chain SPFs: `/gpfs/projects/t/titan/pdk/models/upl/2hp/cronus_dd1/PPG_RO_A1_Ref_C45_FO3/netlists/<ver>/` (and `PPG_RO_A13_PPG_Suite`). `v0.51` and `v0.6.SB` flat; `v0.53` only has non-Typical corner subdirs. No RPDK0.43 chain SPFs exist -> v0.43 chain is blocked.
+* The chain script `full_dut/PPGRO_DUT_7TINVNANDNOR_menu_sweep_v0p6SB2_slvt` hardcodes SCRIPTDIR, cells and SPF paths; the chain base netlist has no v0.6SB / V0.430 model blocks. The chain flow is NOT agent-ready; agent mode is single-stage only.
+
+## Runbook — single-stage sweep for a new model, end to end (agent mode follows this)
+
+0. **Verify extraction params are consistent with the model (Issue 29) and run the Issue 27 pre-flight (24-cell SPF port-order + TCAD check) for every new model/SPF dir - mandatory.**
+1. Pick model row from the Issue 21 table (or ask the user for MODEL_INC/MODEL_LIB/SPFDIR/TCAD tag). `ls` both model files and `ls $SPFDIR/PPG1_INV_X2_7TSL.spf`; `grep -m1 TCAD_GRD_FILE` it.
+2. `export MODEL_NAME=... MODEL_INC=... MODEL_LIB=... SPFDIR=... SPF_TCAD_EXPECT=...`; run `fs lq .` - must be < ~70% used (Issue 28).
+3. Dry run: `ksh run_ppg_sim.sh -d` -> confirm `grep "^\.inc\|^\.lib" run_vdd_<name>_slvt/0_7/7TSL_INV/invfo3_mod.sp` shows one sandbox, and `PPGchain.spf` first `.SUBCKT` ends `VSS VDD A Z`.
+4. Regression first: single point `-v 0.70` on all cells (`ksh run_ppg_sim.sh -v 0.70 ...`), check no MISSING.
+5. Full sweep: `ksh run_ppg_sim.sh` (336 LSF jobs, `-R select[...]` is in the script; Issue 19). Run in background; poll `bjobs | grep PPG_<name>`.
+6. Exit 0 required. On exit 1 read `<results>.missing`, fix cause (Issues 1/5/19), rerun with `CELL_FILTER` for those cells.
+7. Result file `PPGRO_chain_menu14_<name>_slvt.txt` -> `add_dataset_to_html.py` (Issue 24) -> both verify scripts must pass.
+8. Show the user: 7TSL_INV stage_delay @0.70V, 24-cell count, SPF TCAD header. STOP and ask before `git add/commit/push`.
+9. Push per "GitHub push procedure" (explicit `git add` of index.html, ppg_results.html, the results .txt, NOTES.md; token URL; never `origin`). Then `curl` the live site for the dataset id; remind the user to hard-refresh (Issue 18).
+10. Log any new problem as a numbered Issue in BOTH SKILL.md and NOTES.md.
+11. Cleanup binaries (Issue 13/28) right after `.lis` count = 336 - not optional, AFS quota is ~9.3 GB.
+
+
+---
+
+## Issue 26 — New SPF sets (tpdk0.53, rpdk0.43) have port orders the old sed rules did not cover
+
+**Symptom (caught in dry-run, before any LSF submit):** `PPGchain.spf` of `7TSL_INV` kept `.SUBCKT PPG1_INV_X2_7TSL Z VSS A VDD`, so the netlist would connect the wrong nodes (same failure class as Issue 5: `stage_delay=failed` or silently wrong numbers).
+**Found by:** processing all 24 cells of each new SPF set and checking that the first `.SUBCKT` ends in `VSS VDD A Z`.
+
+| SPF set | Raw orders NOT handled before | Cells |
+|---|---|---|
+| tpdk0.53 | `Z VSS A VDD` / `A Z VDD VSS` | 7TSL_INV; 7TSL_NAND2B, 7TSL_NOR2B |
+| rpdk0.43 | `VDD Z VSS A` / `VDD VSS A Z` | AOI21 x 6T/7T/8T; OAI21 and OAI22 x 6T/7T/8T (6TSL_OAI21/22, 7TSL_OAI21/22, 8TSL_OAI21/22) |
+| tpdk0.6sb | none (all 24 already `VSS VDD A Z`) | - |
+
+**Fix (2025-10):** `ppg_sim_lib.sh` gained `_SUBCKT_SED_4..7` (applied in both `process_spf` and `process_spf_slvt`). `run_ppg_sim.sh` now has a port-order guard right after SPF processing: if the first `.SUBCKT` does not end in `VSS VDD A Z`, it prints the offending line and **exits 1 before any job is submitted**. If a future SPF set trips the guard, add one more `_SUBCKT_SED_n` rule AND register it in both process functions; re-verify all 24 cells.
+**Verified:** dry-run (`-d -v 0.70`) of both sets: 24/24 `VSS VDD A Z`; TPDK0.53 patched netlist uses `V0.51/Spice`, RPDK0.43 uses `SpiceModel_V0.430/Hspice`; wrong `SPF_TCAD_EXPECT` aborts with exit 1.
+**Lesson:** always dry-run a new SPF set and inspect all 24 headers before the first real sweep; ports are matched by NAME, so only the `.SUBCKT` header line needs rewriting.
+
+## Quick env block (copy/paste)
+
+```sh
+# TPDK0.53
+export MODEL_NAME='v0.53' \
+  MODEL_INC='/afs/apd/ant/research/prod/2HP/V0.51/Spice/design_include.inc' \
+  MODEL_LIB='/afs/apd/ant/research/prod/2HP/V0.51/Spice/fixed_corner.lib' \
+  SPFDIR='/gpfs/projects/t/titan/dtco/usr/sbajaj/public/for_Imran/SPF_files/tpdk0.53/2HP_Cronus' \
+  SPF_TCAD_EXPECT='V0p53'
+# RPDK0.43
+export MODEL_NAME='v0.43' \
+  MODEL_INC='/afs/apd/ant/cte_tech/1p4/IIMmintaka/common/pdk/IIM/SpiceModel_V0.430/Hspice/design_include.inc' \
+  MODEL_LIB='/afs/apd/ant/cte_tech/1p4/IIMmintaka/common/pdk/IIM/SpiceModel_V0.430/Hspice/fixed_corner.lib' \
+  SPFDIR='/gpfs/projects/t/titan/dtco/usr/sbajaj/public/for_Imran/SPF_files/rpdk0.43/2HP_Cronus' \
+  SPF_TCAD_EXPECT='V0p42'
+ksh run_ppg_sim.sh            # full 14-point sweep; run dir run_vdd_<MODEL_NAME>_slvt
+```
+Note: `MODEL_NAME` also names the run dir and result file (`run_vdd_v0.53_slvt/`, `PPGRO_chain_menu14_v0.53_slvt.txt`). Existing dirs with those names hold the OLD V0.61-parasitic data - move them to `archive_<name>_oldSPF/` before rerunning (never overwrite silently).
+HTML ids: `v0p53_SLVT_TT`, `v0p43_SLVT_TT` (use `--replace`). Labels: `TPDK0.53 (Spice-V0.51-prod)`, `RPDK0.43 (SpiceModel_V0.430)`.
+
+## Custom Bob mode
+
+`.bob/custom_modes.yaml` (workspace scope) defines mode **PPG Sim Agent** (`ppg-sim-agent`): loads this skill first, single-stage only, asks before any git push. Edit that file to change its behaviour; keep it in sync with this runbook.
+
+
+---
+
+## Issue 27 — MANDATORY pre-flight for every new model / SPF set (port-order + TCAD check)
+
+Run this BEFORE the first real submit for any model or SPF directory not already validated. Do not skip it, even if the SPF folder "looks the same" as a previous one (Issues 5, 21, 26 were all caught this way).
+
+```sh
+. ./ppg_sim_lib.sh
+echo "$PPG_STD_CELLS_24" | while read l f s; do [ -z "$l" ] && continue
+  [ -f "$SPFDIR/$f" ] || { echo "MISSING SPF: $f"; continue; }
+  h=$(sed -e "$_SUBCKT_SED_1" -e "$_SUBCKT_SED_2" -e "$_SUBCKT_SED_3" -e "$_SUBCKT_SED_4" \
+         -e "$_SUBCKT_SED_5" -e "$_SUBCKT_SED_6" -e "$_SUBCKT_SED_7" "$SPFDIR/$f" | grep -m1 -i '^\.SUBCKT')
+  case "$h" in *"VSS VDD A Z") ;; *) echo "BAD PORT ORDER $l: $h";; esac
+done                                                      # must print nothing
+grep -m1 TCAD_GRD_FILE "$SPFDIR/PPG1_INV_X2_7TSL.spf"      # must match the model's StarRC release
+ksh run_ppg_sim.sh -d -v 0.70                              # dry run: guard in script re-checks all 24
+```
+Checklist (all must be true, record them in the final report to the user):
+1. 24/24 SPF files exist in `$SPFDIR`.
+2. 24/24 first `.SUBCKT` lines normalise to `VSS VDD A Z`; if any do not, add a `_SUBCKT_SED_n` rule to `ppg_sim_lib.sh`, register it in BOTH `process_spf` and `process_spf_slvt`, re-run this check, and log it as a new Issue in SKILL.md + NOTES.md.
+3. TCAD header matches the model (Issue 21 table) and `SPF_TCAD_EXPECT` is exported.
+4. Dry-run netlist has exactly one active `.inc` and one `.lib`, both from the intended sandbox.
+5. `run_ppg_sim.sh` itself aborts (exit 1) if any processed SPF fails the port-order guard, but the guard only knows the 7 rules above - step 2 still has to be done by a human/agent when it trips.
+
+
+---
+
+## Issue 28 — AFS home quota exhausted mid-sweep: misleading "unknown SPF port order" abort
+
+**Symptom:** full RPDK0.43 sweep aborted at 0.7 V / `6TSL_OAI21` with `ERROR: unknown SPF port order for 6TSL_OAI21:` (EMPTY `.SUBCKT` line) preceded by `mkdir: cannot create directory ...: Disk quota exceeded`. The single-point regression and dry run had passed, so the port-order guard looked wrong - it was not.
+**Root cause:** `fs lq .` showed `usr.imranyou 9766000 used 9766462 100%`. HSPICE binaries (`*.dp0`, `*.ic0`, `*.ic0@0`, `*.mt0`, `*.pa0`: ~6 MB per cell-run, ~2 GB per 336-run sweep) from the finished v0.53 sweep plus two archived old-SPF run dirs (2.0 GB + 2.2 GB) filled the 9.3 GB AFS volume. An empty SPF means the write failed, not that the port order is unknown.
+**Fix:** (1) `bkill -J "PPG_v0.43*"` the stragglers; (2) delete binaries from finished/archived runs (Issue 13 command: `find <dir> \( -name "*.dp0" -o -name "*.ic0" -o -name "*.ic0@0" -o -name "*.tr0" -o -name "*.mt0" -o -name "*.pa0" -o -name "*parseonly*" \) -delete`; 336 `.lis` files must exist first); archives shrank 2.0 GB -> 304 MB and usage went 100% -> 39%; (3) remove the partial run dir and rerun the whole sweep.
+**Script hardening:** `run_ppg_sim.sh` now checks the processed SPF exists and is non-empty (`3a`) and exits with `could not write ... (disk quota? run: fs lq .)` instead of the misleading port-order message.
+**Mandatory pre-sweep check (add to every runbook run):** `fs lq .` must show < ~70% used (a full sweep needs ~2.5 GB). Cleanup binaries immediately after each model's `.lis` count = 336. Do not archive old runs without stripping binaries first.
+
+
+---
+
+## Issue 29 — MANDATORY: extraction parameters must be consistent with the model, verified every run
+
+Parasitic extraction (StarRC) and the SPICE model are separate inputs; a mismatch is silent (Issue 21: right model + V0.61 parasitics produced plausible but wrong numbers for two published datasets). Before EVERY run, and again in the report to the user, verify all of:
+
+1. **TCAD grid release** in the SPF header (`grep -m1 TCAD_GRD_FILE $SPFDIR/PPG1_INV_X2_7TSL.spf`) is the extraction release the model's PDK specifies (Issue 21 table). Also check the same line in 2-3 other cells (e.g. `PPG1_AOI21_X1_1S0_7TSL.spf`, `PPG1_OAI22_X1_0S11_8TSL.spf`) - all must be the same file.
+2. **Corner/variant in the TCAD name** is Typical (`_Typical_`, no `Cworst/Cbest/RC*`) unless the user asked for another corner.
+3. **SPF date** (`*|DATE`) and `*|PROGRAM "StarRC"` recorded in the report; SPF set must be a single extraction run (dates within the same day/batch).
+4. **Same-release cross-check:** the model's own PDK documentation/table names which PEX it uses (e.g. TPDK0.53 = V0.51 SPICE/LVS + V0.53 StarRC; RPDK0.43 = V0.430 SPICE + RPDK0.42 StarRC). If the pairing is not in the Issue 21 table, ask the user - never infer it from a folder name.
+5. **`SPF_TCAD_EXPECT` is exported** to a substring unique to that release (`V0p53`, `V0p42`, `V0p61`); `run_ppg_sim.sh` aborts if the header does not contain it.
+6. **Result sanity vs. a different-parasitic baseline:** if 7TSL_INV stage_delay @0.70V is identical (to 5 digits) to another model's published value, the SPFs were probably identical - compare with `cmp` against the other SPF set before publishing.
+7. **Net-list side adders** (`cov_tune`, `rdext_tune`, `rsext_tune`, `.temp`) in `invfo3_base.sp` are the same for models being compared, or the difference is stated.
+
+Record all values (TCAD path, date, SPF dir) in the final report and in the dataset's commit message.
+
+**Validated values (2025-10):**
+| Model | TCAD header | SPF date | 7TSL_INV @0.70V |
+|---|---|---|---|
+| TPDK0.53 | `prod/2HP/V0.53/StarRC/tcad/2HP_V0p53_Typical_16M.nxtgrd` | 2026-07-30 | 6.28300 ps (old wrong-SPF run: 6.16968) |
+| RPDK0.43 | `PDKs/RPDK0.43/V43/PEX/StarRC/20M_6Mx_10Dx_2Kx_2Gx_LB/tcad/2HP_RPD_StarRC_20M_6Mx_10Dx_2Kx_2Gx_LB_V0p42_0.nxtgrd` | 2026-08-16/17 | 6.35451 ps (old wrong-SPF run: 6.14608) |
