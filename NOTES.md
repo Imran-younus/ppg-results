@@ -778,3 +778,123 @@ Record all values (TCAD path, date, SPF dir) in the final report and in the data
 |---|---|---|---|
 | TPDK0.53 | `prod/2HP/V0.53/StarRC/tcad/2HP_V0p53_Typical_16M.nxtgrd` | 2026-07-30 | 6.28300 ps (old wrong-SPF run: 6.16968) |
 | RPDK0.43 | `PDKs/RPDK0.43/V43/PEX/StarRC/20M_6Mx_10Dx_2Kx_2Gx_LB/tcad/2HP_RPD_StarRC_20M_6Mx_10Dx_2Kx_2Gx_LB_V0p42_0.nxtgrd` | 2026-08-16/17 | 6.35451 ps (old wrong-SPF run: 6.14608) |
+
+
+---
+
+## Issue 30 — Validating a new model run: benign "failed" measures and the SPF `lle_npbn` effect on iddq
+
+**False alarm to avoid:** `grep -il failed *.lis` matches ALL 336 `.lis` files of every run, including the published v0.6SB and v0.6SB2 runs. The measures `tdlyfr1`, `tdlyrf1` and `tmin` always print `failed` (they use `TD=500n` / `tfall650..trise799` windows that the single-stage netlist never reaches). They are NOT used by `stage_delay` (= `tdlyrr1/2*1e12`) or the five published metrics. A real failure is `stage_delay= failed` or a missing `stage_delay=` line (Issue 22 `.missing` file). Check with: `grep -L "stage_delay=" ...` (must be empty) and `grep "stage_delay= *failed"` (must be empty), not a bare `failed` grep.
+
+**Validation checklist used for RPDK0.43 (2025-10), reuse for any model:**
+1. 336/336 `.lis` have a numeric `stage_delay=`; 336/336 netlists have exactly one `.inc` from the intended sandbox and `.temp =25`.
+2. For all 24 cells x 14 VDD: stage_delay and acreff strictly decrease with VDD; iddq, iddarail, acceff strictly increase; no non-positive values (RPDK0.43: zero violations).
+3. 6TSL > 7TSL > 8TSL delay for every cell type (taller cell = faster), and NAND2 < NAND3, AOI/OAI ordering as in other models.
+4. Ratio vs another model (v0.43/v0.53, median): delay 1.07, iddq 0.65, iddarail 0.93, acceff 1.00, acreff 1.08.
+
+**Why RPDK0.43 iddq moved -17% (7TSL_INV @0.70V) and -15% on average when only the SPF changed:** same SPICE model, only the SPF differs between the old (tpdk0.6sb) and new (rpdk0.43) runs. Comparing the device lines of the SPFs: W, L, NF, and `lle_fse/fsw/pcrxn/pcrxs` are identical; the one device-parameter difference is `lle_npbn` / `lle_npbs` = **2.55e-08 in all 24 RPDK0.43 SPFs vs 5.1e-08 in tpdk0.53 and tpdk0.6sb** (RPDK0.43 also adds `M=1`, and hierarchical `XI_...` instance names). These layout-effect parameters feed the model's LLE stress equations, which scale leakage. Delay and ac metrics move less (+3% / +8% avg). The causal link to `lle_npbn` is inferred from this single differing parameter plus the same-model/different-SPF comparison; it was not isolated by a one-parameter simulation.
+**Lesson (extends Issue 29):** compare not only the TCAD header but also the per-device parameter set (`lle_*`, `M`, `NF`, `W`, `L`) between SPF sets when explaining leakage differences. A leakage change from "parasitics only" is expected whenever the SPF carries different LLE parameters.
+
+
+---
+
+## Issue 31 — Netlist extraction reference (LVS/PEX scripts, SPF locations, chain layouts) — READ-ONLY findings, 2025-10
+
+Source of paths: Sbajaj hand-off sheet (items 1 and 2) + inspection of the scripts. Nothing here was executed; extraction has NOT been run from this account yet.
+
+### The two directory paths from the hand-off sheet
+| # | Path | Contents |
+|---|---|---|
+| 1 | `/gpfs/projects/t/titan/dtco/usr/sbajaj/public/ppg_sims/spf_script_jason/` | Original LVS/PEX scripts from Jason + Sbajaj's TPDK/RPDK versions. Files: `runallpnr` (2.5K), `runallpnr.README`, `runlvspnr` (4.9K), `runpexpnr` (2.7K), folder `sb_versions/`. |
+| 2 | `/gpfs/projects/t/titan/dtco/usr/sbajaj/public/for_Imran/SPF_files/{rpdk0.43,tpdk0.53}/2HP_Cronus/` | The single-stage extracted SPFs the sweep flow uses (96 `PPG1_*` files each; 24 cells needed). Already wired into the Issue 21 table. |
+Other Sbajaj areas seen: `public/PDKs/{RPDK0.43/V43, RPDK0.5SB1}` (LVS deck + StarRC TCAD), `public/ppg_sims/{RC_partition,trial1,...}`, `verif_work/` (run dirs, e.g. `PPG_Macro_ROs`), `SPF_files/{tpdk0.52,tpdk0.53,tpdk0.6sb,tpdk0.6sb2,rpdk0.43,...}` (older copies).
+
+### What each script does
+| Script | Role |
+|---|---|
+| `runallpnr <lib> [-pex\|-lvs]` | Driver. Needs `cds.lib` (defining `<lib>`) in the current dir and a `verif_work/` dir. Loops over `<lib_dir>/*/` cells that have BOTH `schematic` and the chosen layout view (skips `ALL*`, `DRC*`, `*_2CLK`) and `bsub`s one job per cell to queue `titan` (job group limited to 10 running). No flag = LVS + PEX. |
+| `runlvspnr [-pex] <lib> <cell>` | `oasisout` streams the layout to OASIS; for LVS it also netlists the schematic to CDL with `si` (auCdl) and runs `icv` LVS; with `-pex` it runs `icv -ex` (extract only) to make the database StarRC needs. Sources `sourceme_LVS` / `sourceme_PEX` from `/gsa/pokgsa/projects/p/pde/cte_tech/{2hp,1p4}/tools/cte/LVST/`. Uses `$TECHDIR`, `$BEOL_STACK`. |
+| `runpexpnr <lib> <cell>` | Writes `star_cmd` (EXTRACTION: RC, 25 C, POWER_NETS VDD VSS, TCAD_GRD_FILE, MAPPING_FILE) and runs `StarXtract`; inserts `cell_info.txt` into the SPF `** COMMENTS`; copies `<cell>.spf` to `git_dir` and `rel_dir`. |
+| `runallpnr.README` | Start a CTE xterm (no cteCds session needed but the CTE startup sets variables the scripts use, e.g. `CTEUSRHOME`); edit "USER SET VARIABLES" at the top of all three scripts first. |
+
+### Which version produces which SPF set (diff of `sb_versions/` vs top level)
+| Script version | LVS deck / ICV | StarRC TCAD | SPFs written to | layout view |
+|---|---|---|---|---|
+| top level (Jason) | `prod/2HP/V0.52/ICV`, stack 16M_6Mx_6Dx_2Kx_2Gx_LB | `prod/2HP/V0.52/StarRC/tcad/2HP_V0.5_16M_Typical.nxtgrd` | `$PWD/cmos2hp_stdcells/<lib>/SPF` | `layoutPlaced`, lib under `jasonstu/icl` |
+| `sb_versions/runallpnr, runlvspnr, runpexpnr` (TPDK) | `prod/2HP/V0.52/ICV` (OPEN QUESTION: hand-off table says TPDK0.53 uses V0.51 LVS) | `prod/2HP/V0.53/StarRC/tcad/2HP_V0p53_Typical_16M.nxtgrd` + `2HP.mapfile` | `SPF_files/test/<lib>` | `layout`, lib under `1p4/IIMmintaka/usr/sbajaj/icl` |
+| `sb_versions/*_rpdk` (RPDK) | `PDKs/RPDK0.43/V43` deck `2HP_RPD_ICVLVS_V0p43_0.rs`, stack 20M_6Mx_10Dx_2Kx_2Gx_LB, adds `-stc <cell>`, `*.rs` | `PDKs/RPDK0.43/V43/PEX/StarRC/20M_6Mx_10Dx_2Kx_2Gx_LB/tcad/2HP_RPD_StarRC_..._V0p42_0.nxtgrd` + its `.mapfile` | `SPF_files/rpdk0.43/<lib>` | same |
+The RPDK TCAD file matches the header in the `rpdk0.43/2HP_Cronus` SPFs (Issue 29 check passes), which is how the script version is tied to the data.
+Hardcoded in `sb_versions`: `lib_dir=.../1p4/IIMmintaka/usr/sbajaj/icl/${lib_name}/work/cds`, `bsub -oo /gpfs/.../sbajaj/verif_work/...`, `RUNDIR`, `git_dir`, `rel_dir`. `runlvspnr` still does `cp $CDLFILE ${CTEUSRHOME}/netlist` (needs CTEUSRHOME set). To use another library or output area, COPY the three `*_rpdk` scripts to our own dir and edit `lib_dir`, the `verif_work` paths and `rel_dir`; never edit Sbajaj's files.
+
+### Chain (101-stage DUT) layouts and SPFs that already exist
+`/gpfs/projects/t/titan/pdk/models/upl/2hp/cronus_dd1/{PPG_RO_A1_Ref_C45_FO3, PPG_RO_A13_PPG_Suite}/` hold `A01_Dxx_PPG_DUT.oas` / `A13_Dxx_PPG_DUT.oas` (+ `layoutWork/`) and `netlists/<ver>/`:
+- `v0.51`: complete 7T SLVT set (A1_8 INV + A13_7..A13_12 NAND2/NAND3/NOR2 B/T), 35-50 MB each, TCAD `2HP_V0.5_16M_Typical` (V0.51 StarRC). READY for a 0.51 chain.
+- `v0.6.SB`: complete, TCAD `V0p61_Typical` (used for published v0.6SB/SB2 chains).
+- `v0.53`: only `Cbest/Cworst/RCbest/RCworst` corner dirs + raw `extract/` StarRC outputs; NO Typical SPF.
+- No RPDK0.43 / Rapidus 20M chain layout exists there.
+
+### Rapidus library offered for RPDK extraction: `/gpfs/projects/c/c18/mintaka/usr/shirina/icl/test_C18mintaka_PPG_ROs` (inspected 2025-10)
+- 80 cell dirs under `work/cds/`; only 22 have BOTH `layout/layout.oa` and `schematic/sch.oa`: `{AOI22,NAND2,NAND3,NOR2,NOR3}_X1_5T_125H_RX15_{F01,F03}_SLVT_{B,T}_M2` and `INV_X2_5T_125H_RX15_{F01,F03}_SLVT_M2`. The other 58 (`*_SL_RX15`, `*_SL_RX18`, ...) lack one view.
+- `NAND2_X1_5T_125H_RX15_F01_SLVT_B_M2` has both views (layout.oa 7.8 KB, sch.oa 14 KB, ICV vue/DRC result dirs present). It is a SINGLE CELL, not a ring. The library contains no DUT/RO/chain/ring cell (grep for RO/DUT/RING/CHAIN/ENA found nothing).
+- `layout.oa.cdslck` shows an Edit Lock owned by `shirina` (ric011b, 2025-10-08): read/stream-out should work but never save in that lib.
+- There is no `cds.lib` inside the library; `runallpnr` needs one in the run dir with `DEFINE test_C18mintaka_PPG_ROs /gpfs/projects/c/c18/mintaka/usr/shirina/icl/test_C18mintaka_PPG_ROs/work/cds`-style entry (verify the exact line format against a working `cds.lib` before use).
+- Tools: this login shell has NONE of `oasisout si icv StarXtract virtuoso` on PATH and `CTEUSRHOME` is empty. They exist on AFS (`/afs/apd/func/vlsi/cte/tools/cds/IC/20.1.32/bin/{virtuoso,oasisout,si,strmout}`, `/afs/apd/func/vlsi/cte/tools/synopsys/icv`; a StarXtract at `/afs/apd/ant/cad_tools/synopsys9/W-2024.09-SP2/bin/StarXtract` returned Permission denied). Whether these run from this account/queue `titan` is UNVERIFIED.
+- Cell family mismatch to resolve: the single-stage flow simulates `PPG1_*_{6,7,8}TSL` cells (2HP Cronus); this library is 5T/125H `RX15` cells (C18 mintaka). Which RPDK0.43 tech/stack they target is not stated anywhere I could read.
+
+### Verdict / what is needed for chain sims with extracted parasitics
+1. 0.51 chain: layouts + Typical V0.51 SPFs EXIST; blockers are only flow bugs (Issue 23, chain base netlist `/afs/apd.pok.ibm.com/ant/...` vs `/afs/apd/ant/...` path prefix and hardcoded cells/SPF paths; port-order check of `A01_D08_PPG_DUT ENA GND VDD OUT`; subdirs `2HP_V0p52V28/V32` unexplained).
+2. 0.43 chain: the offered library only allows SINGLE-CELL extraction (equivalent to what `rpdk0.43/2HP_Cronus` already gives). A chain needs a whole-ring layout (enable NAND2 + 100 inverters + output buffer + dummies as ONE cell with ports ENA GND VDD OUT) in an RPDK-stack library plus its schematic; none exists. Ask the layout owner (shirina / Sbajaj) for it, then run the `*_rpdk` scripts on it, check the TCAD header = V0p42 (Issue 29) and all port orders (Issue 27), then adapt the chain flow.
+3. 0.53 chain: needs a Typical V0.53 extraction (only corner dirs exist).
+
+---
+
+## Issue 32 — Rapidus C18mintaka Layout OASIS Export & ICV/StarRC PEX Extraction Flow
+
+**Date:** 2026-10
+**Cells extracted:**
+- `NAND2_X1_5T_125H_RX15_F03_SLVT_B_M2` (FO3 layout variant, from `/gpfs/projects/c/c18/mintaka/usr/shirina/icl/test_C18mintaka_PPG_ROs/work/cds`) -> `layout/NAND2_X1_5T_125H_RX15_F03_SLVT_B_M2.spf` (**11 MB**, 22,929 resistors, 170,268 capacitors).
+- `NAND2_X1_5T_125H_RX15_F01_SLVT_B_M2` (FO1 layout variant) -> `layout/NAND2_X1_5T_125H_RX15_F01_SLVT_B_M2.spf` (**5.1 MB**, 14,326 resistors, 90,423 capacitors).
+
+**Working directory:** `/afs/apd.pok.ibm.com/u/imranyou/for_imran/layout/`
+**Automated runner:** `layout/run_extract.sh <CELLNAME> [LIBNAME]`
+
+### Flow & Tool Invocations
+
+1. **Cadence OASIS Stream-Out (`oasisout`):**
+   - Environment sourced from `/afs/apd/ant/cte_tech/1p8/C18mintaka/usr/imranyou/.cds_env_vars`
+   - Generates `.oas` layout stream file with `-enableColoring`.
+
+2. **Synopsys IC Validator (`icv`):**
+   - **Tool version requirement:** `/gpfs/projects/t/tools/Synopsys/icvalidator/W-2024.09-SP4-1` (version >= 2023.12 required; older U-2022.12 fails with `#error This PXL runset was generated to run with ICV version 2023.12 and newer`).
+   - Sourced `/gsa/pokgsa/projects/p/pde/cte_tech/1p4/tools/cte/LVST/sourceme_PEX`
+   - Run mode: `-ex` (device extraction only, creates `run_details/` database for StarRC without requiring schematic CDL).
+   - Note on `-ece` flag: Do NOT pass `-ece` to ICV during sub-block extraction, as DRC violations in sub-blocks without seal rings trigger `EXIT_COMPLETE_WERROR` (exit code 30) despite successful device extraction. Check for directory existence of `run_details/` instead.
+   - LVS deck: `/gpfs/projects/t/titan/dtco/usr/sbajaj/public/PDKs/RPDK0.43/V43/LVS/2HP_RPD_ICVLVS_V0p43_0.rs`
+
+3. **Synopsys StarRC (`StarXtract`):**
+   - **Tool path:** `/gpfs/projects/t/tools/Synopsys/starrc/X-2025.06-SP2-1`
+   - TCAD Grid: `/gpfs/projects/t/titan/dtco/usr/sbajaj/public/PDKs/RPDK0.43/V43/PEX/StarRC/20M_6Mx_10Dx_2Kx_2Gx_LB/tcad/2HP_RPD_StarRC_20M_6Mx_10Dx_2Kx_2Gx_LB_V0p42_0.nxtgrd`
+   - Mapfile: `.../2HP_RPD_StarRC_20M_6Mx_10Dx_2Kx_2Gx_LB_V0p42_0.mapfile`
+   - Command file: generated dynamically per cell with full reduction and power extract options.
+
+4. **Directory Hygiene & Disk Space Management:**
+   - Intermediate ICV/StarRC databases (`run_details/`, `star/`, `agds.gds`, `agds.sp`, `*.LAYOUT_ERRORS`, `*.RESULTS`, `*.net`, etc.) take 30+ MB per run and are automatically deleted at the end of `run_extract.sh`, retaining only `.oas`, `.spf`, and execution logs.
+
+### 101-Stage Ring Macro Topology & Simulation Status
+
+1. **Extracted Netlist Attributes (`NAND2_X1_5T_125H_RX15_F03_SLVT_B_M2.spf`):**
+   - Contains 1,212 transistors (101 stages $\times$ 12 FETs/stage) + internal wiring RC network.
+   - Total extracted size: 11 MB (22,929 resistors, 170,268 capacitors).
+
+2. **SPF Port Interface & Bridging Resolution:**
+   - **Root Cause of Initial Failure:** Sub-block extraction without schematic pin CDL cross-reference emitted `.SUBCKT NAND2_X1_5T_125H_RX15_F03_SLVT_B_M2` without port arguments, and internal nets were fractured with colon suffixes (e.g. `2:50388`, `3:5248`, `ENA_IN:56489`, `43:F27634`).
+   - **Internal Net Mapping & Port Bridging (Validated in `layout/NAND2_X1_5T_125H_RX15_F03_SLVT_B_M2.spf`):**
+     - Ground rail (`VSS`): Net `2` bridged via `R_PORT_VSS VSS 2:50388 1u`
+     - Power rail (`VDD`): Net `3` bridged via `R_PORT_VDD VDD 3:5248 1u`
+     - Enable input (`ENA`): Net `ENA_IN` bridged via `R_PORT_ENA ENA ENA_IN:56489 1u`
+     - Ring output (`RO_OUT`): Net `43` bridged via `R_PORT_OUT RO_OUT 43:F27634 1u`
+   - **Full VDD Sweep (0.50 V – 1.15 V, 14 points, SLVT, 25°C):**
+     - Successfully simulated via `full_dut/run_ppg_dut.sh -c NAND2_X1_5T_125H_RX15_F03_SLVT_B_M2 -s layout/NAND2_X1_5T_125H_RX15_F03_SLVT_B_M2.spf -m v0.43 -v sweep`.
+     - `stage_delay`: 26.46 ps @ 0.50 V → 14.61 ps @ 0.70 V → 9.45 ps @ 1.15 V (monotonic scaling).
+     - `stage_freq`: 37.79 GHz @ 0.50 V → 68.44 GHz @ 0.70 V → 105.77 GHz @ 1.15 V.
+     - Full results saved to `full_dut/results_dut_v0.43_NAND2_X1_5T_125H_RX15_F03_SLVT_B_M2.txt`.

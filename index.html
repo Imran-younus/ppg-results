@@ -1293,11 +1293,17 @@ function buildSelectors(){
   const models=[...new Set(ids.map(id=>DATASETS[id].model))];
   const activeDs=ds();
 
-  // Model selector — hidden on cmp page (cmp compares ALL models simultaneously)
+  // Model selector — filter models by page type: for chain/raw/topo pages, only show models with chain_cells
+  const pVal=document.getElementById('page-select').value;
+  const isChainPage=(pVal==='chain'||pVal==='raw'||pVal==='topo');
+  const allowedModels=isChainPage
+    ? models.filter(m=>ids.some(id=>DATASETS[id].model===m && !!DATASETS[id].chain_cells && DATASETS[id].chain_cells.length>0))
+    : models;
+
   const mSel=document.getElementById('model-select');
-  mSel.innerHTML=models.map(m=>`<option value="${m}"${m===activeDs.model?' selected':''}>${DATASETS[ids.find(id=>DATASETS[id].model===m)].name}</option>`).join('');
+  mSel.innerHTML=allowedModels.map(m=>`<option value="${m}"${m===activeDs.model?' selected':''}>${DATASETS[ids.find(id=>DATASETS[id].model===m)].name}</option>`).join('');
   document.querySelector('.sel-group:has(#model-select)').style.display=
-    document.getElementById('page-select').value==='cmp'?'none':'';
+    pVal==='cmp'?'none':'';
 
   // Vt selector — show only if >1 vt for active model
   const vts=[...new Set(ids.filter(id=>DATASETS[id].model===activeDs.model).map(id=>DATASETS[id].vt))];

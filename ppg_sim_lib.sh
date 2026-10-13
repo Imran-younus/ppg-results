@@ -115,11 +115,11 @@ verify_model() {
 }
 
 #-----------------------------------------------------------------------------
-# patch_netlist <src> <dst> <spf_path> <subckt> [pvdd] [temp]
-# Injects model pair, SPF path, subcircuit, PVDD, and temperature.
+# patch_netlist <src> <dst> <spf_path> <subckt> [pvdd] [temp] [stages]
+# Injects model pair, SPF path, subcircuit, PVDD, temperature, and stages.
 #-----------------------------------------------------------------------------
 patch_netlist() {
-    _pn_src=$1 _pn_dst=$2 _pn_spf=$3 _pn_subckt=$4 _pn_pvdd=$5 _pn_temp=$6
+    _pn_src=$1 _pn_dst=$2 _pn_spf=$3 _pn_subckt=$4 _pn_pvdd=$5 _pn_temp=$6 _pn_stages=$7
 
     _pn_sedscript=$(mktemp /tmp/ppg_patch_XXXXXX.sed)
 
@@ -133,6 +133,8 @@ patch_netlist() {
 
     # 3. Substitute SPF path and subcircuit tokens
     if [ -n "$_pn_spf" ]; then
+        printf 's^'"'"'Titan_spf'"'"'^'"'"'%s'"'"'^\n'   "$_pn_spf" >> "$_pn_sedscript"
+        printf 's^'"'"'netlist_spf'"'"'^'"'"'%s'"'"'^\n' "$_pn_spf" >> "$_pn_sedscript"
         printf 's^.Titan_spf^ %s^\n'   "$_pn_spf" >> "$_pn_sedscript"
         printf 's^.netlist_spf^ %s^\n' "$_pn_spf" >> "$_pn_sedscript"
     fi
@@ -149,6 +151,11 @@ patch_netlist() {
     # 5. Inject temperature
     if [ -n "$_pn_temp" ]; then
         printf 's|^\.temp[ =]*[-0-9.]*|.temp =%s|\n' "$_pn_temp" >> "$_pn_sedscript"
+    fi
+
+    # 6. Inject STAGES (if provided)
+    if [ -n "$_pn_stages" ]; then
+        printf 's|\.param STAGES=[0-9][0-9]*|.param STAGES=%s|\n' "$_pn_stages" >> "$_pn_sedscript"
     fi
 
     sed -f "$_pn_sedscript" < "$_pn_src" > "$_pn_dst"
