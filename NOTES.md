@@ -1125,3 +1125,21 @@ ksh run_ppg_sim.sh --chain --cell <layout cell> [--lib test_C18mintaka_PPG_ROs] 
 |---|---|---|---|---|---|
 | TPDK0.53 `5T_NAND2_F03` | 0.70 V | 13.80820 | 2.06062 | 6.70100 | 3.66357 |
 (SPF: RPDK0.43 `V0p42` parasitics, same layout as RPDK0.43 chain — intentional model-only comparison)
+
+---
+
+## Issue 41 — All result .txt files moved to results/ directory (2026-10-14)
+
+**Change:** Created `results/` directory at workspace root. All simulation result text files moved there.
+
+**Files now in `results/`:**
+- `PPGRO_chain_menu14_*.txt` — single-stage VDD sweep results (all 4 models + early legacy files)
+- `chain_results_*.txt` — old chain collection results (legacy, from broken `collect_chain_and_push.sh`)
+- `results_dut_*.txt` — full DUT chain simulation results
+
+**Scripts updated to write to `results/` by default:**
+- `ppg_run.sh` — single-stage: `results/PPGRO_chain_menu14_<MODEL>_<VT>.txt`; chain: `results/results_dut_<MODEL>_<CELL>.txt`
+- `full_dut/run_ppg_dut.sh` — default `RESULTS` path changed from `full_dut/results_dut_*` to `results/results_dut_*`; also adds `mkdir -p results/`
+- `run_vdd_sweep.sh` — `OUTPUT` default updated to `results/PPGRO_chain_menu14_<MODEL>_<VT>.txt`
+
+**Rule:** All future result files must go to `results/`. Override with `-o <path>` in `run_ppg_dut.sh` or `OUTPUT=<path>` env var if a custom location is needed.

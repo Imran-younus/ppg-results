@@ -26,16 +26,17 @@
 #
 #   Step 1 — Simulation mode
 #       single  →  Single-stage VDD sweep (the standard 24-cell, 5-metric run)
-#       chain   →  101-stage ring oscillator chain (7 cells, SLVT only)
+#       chain   →  101-stage full DUT ring oscillator (any layout SPF, any model)
 #
 #   Step 2 — Model parameters
 #       Model name  : Short label you choose, e.g.  v0.6SB  or  v0.7RC1
+#                     Known labels auto-resolve INC/LIB: v0.43, v0.53, v0.6SB, v0.6SB2
 #                     This label appears in result filenames and on the website.
-#       INC path    : Full path to the design_include.inc file for this model.
-#                     Example: /gpfs/.../Spice-260724-sandbox/design_include.inc
-#       LIB path    : Full path to the fixed_corner.lib file for this model.
+#       INC path    : Only prompted for UNKNOWN model labels.
+#                     Known models (above) skip this prompt entirely.
+#                     Must be the full path to design_include.inc.
+#       LIB path    : Only prompted for UNKNOWN model labels.
 #                     MUST be from the same sandbox folder as the INC file.
-#                     Example: /gpfs/.../Spice-260724-sandbox/fixed_corner.lib
 #       The script will warn you if INC and LIB appear to be from different
 #       sandbox directories (which would produce incorrect mixed-model results).
 #
@@ -46,20 +47,29 @@
 #       Note: chain mode only supports slvt at this time.
 #
 #   Step 4 — VDD (supply voltage)
-#       sweep       →  Full 14-point sweep from 0.5 V to 1.15 V  [default]
+#       sweep       →  Full 14-point sweep from 0.5 V to 1.15 V  [default for single]
 #       0.70        →  Single voltage point
 #       0.6 0.7 0.8 →  Space-separated list of specific voltages
-#       Chain mode always simulates one voltage; default is 0.70 V.
+#       Chain mode default is 0.70 V; sweep and lists are also supported.
 #
 #   Step 5 — Temperature
 #       Integer in degrees Celsius.  Default is 25.
 #       Examples: 25  125  -40
 #
-#   Step 6 — Track height filter  (single-stage mode only)
+#   Step 6 — Track height filter  (single-stage mode only; skipped in chain mode)
 #       all  →  Run all track heights (6T, 7T, 8T)  [default]
 #       6T   →  6-track cells only
 #       7T   →  7-track cells only
 #       8T   →  8-track cells only
+#
+#   Step 6 — Chain layout inputs  (chain mode only; skipped in single-stage mode)
+#       Cell name   : Must match the .SUBCKT name in the layout SPF exactly.
+#                     Default: NAND2_X1_5T_125H_RX15_F03_SLVT_B_M2
+#       SPF path    : Ported layout SPF with ENA VSS VDD RO_OUT port order
+#                     and 4 R_PORT_* bridges. Relative paths are resolved from
+#                     the workspace root.
+#                     Default: extraction/reext_F03/NAND2_X1_5T_125H_RX15_F03_SLVT_B_M2_ported.spf
+#       Stages      : Number of ring oscillator stages. Default: 101
 #
 #   Step 7 — Cell type filter  (single-stage mode only)
 #       all   →  All cell types  [default]
@@ -77,9 +87,12 @@
 #
 # ── RESULT FILES ─────────────────────────────────────────────────────────────
 #
-#   Single-stage full sweep → PPGRO_chain_menu14_<MODEL>_<VT>.txt
-#   Single-stage partial    → PPGRO_chain_<MODEL>_<VT>_results.txt
-#   101-stage chain         → chain_results_<MODEL>.txt
+#   All result files are written to the results/ directory (workspace root).
+#
+#   Single-stage full sweep → results/PPGRO_chain_menu14_<MODEL>_<VT>.txt
+#   Single-stage partial    → results/PPGRO_chain_<MODEL>_<VT>_results.txt
+#   101-stage chain         → results/results_dut_<MODEL>_<CELL>.txt
+#                             (also printed to the terminal as a table on completion)
 #
 # ── HOW TO ADD NEW OPTIONS IN FUTURE ─────────────────────────────────────────
 #
@@ -106,18 +119,32 @@
 #
 # ── TROUBLESHOOTING ───────────────────────────────────────────────────────────
 #
-#   "File not found" on INC or LIB path
+#   "File not found" on INC or LIB path  (only shown for unknown models)
 #       → Check the path is correct and the filesystem is mounted.
-#         You can verify with:  ls /gpfs/.../Spice-XXXXXX-sandbox/
+#         Known models (v0.43/v0.53/v0.6SB/v0.6SB2) never show this — paths are built in.
+#
+#   "SPF not found" error in chain mode
+#       → The SPF path you entered does not exist. Default is:
+#         extraction/reext_F03/NAND2_X1_5T_125H_RX15_F03_SLVT_B_M2_ported.spf
+#         Relative paths are resolved from the workspace root automatically.
+#
+#   "No active design_include.inc" error in chain mode
+#       → The model block in full_dut/PPG_ROM_base.sp uses a different path prefix
+#         than MODEL_INC. See NOTES.md Issue 38. All 4 known models are already fixed.
 #
 #   "Sandbox mismatch" warning
 #       → INC and LIB are from different Spice-*-sandbox directories.
 #         This will produce wrong results.  Use matching paths.
 #
-#   Jobs finish but results show "failed"
+#   Jobs finish but results show "failed"  (single-stage mode)
 #       → Check the .lis file in the cell run directory:
 #         cat run_vdd_<MODEL>_slvt/0_7/<CELL>/invfo3_mod.sp.lis | grep -i fail
 #         See NOTES.md for the full debugging checklist.
+#
+#   Chain results show "-" or "MISSING"
+#       → The LSF job may have landed on a wrong node (no HSPICE). Check:
+#         cat full_dut/run_dut_<MODEL>_<CELL>/<vdd_tag>/invfo3_mod.sp.lis | head -5
+#         "Error : HSPICE is not supported on linux currently" = wrong node (NOTES.md Issue 19)
 #
 #   GitHub push fails
 #       → Verify the token file exists:
@@ -166,7 +193,7 @@ OAI    OAI gates only    (OAI21, OAI22)
 # Simulation modes
 MODE_OPTIONS="
 single   Single-stage VDD sweep (24 cells, 5 metrics each)
-chain    101-stage ring oscillator chain (7 cells, SLVT only)
+chain    101-stage full DUT ring oscillator (any layout SPF, any model)
 "
 
 #=============================================================================
@@ -310,16 +337,46 @@ fi
 
 # ── Step 2: Model parameters ───────────────────────────────────────
 hdr "Step 2: Model Parameters"
-ask MODEL_NAME "Model name (e.g. v0.6SB, v0.6SB2, v0.7)" ""
+echo "  Known models (paths auto-resolved): v0.43, v0.53, v0.6SB, v0.6SB2"
+echo "  For other models, you will be prompted for INC and LIB paths."
+ask MODEL_NAME "Model name" ""
 [ -z "$MODEL_NAME" ] && echo "ERROR: Model name is required." >&2 && exit 1
 
-ask MODEL_INC "Path to design_include.inc" ""
-[ -z "$MODEL_INC" ] && echo "ERROR: MODEL_INC is required." >&2 && exit 1
-[ ! -f "$MODEL_INC" ] && echo "ERROR: File not found: $MODEL_INC" >&2 && exit 1
-
-ask MODEL_LIB "Path to fixed_corner.lib" ""
-[ -z "$MODEL_LIB" ] && echo "ERROR: MODEL_LIB is required." >&2 && exit 1
-[ ! -f "$MODEL_LIB" ] && echo "ERROR: File not found: $MODEL_LIB" >&2 && exit 1
+# Auto-resolve known PDK model paths
+case "$MODEL_NAME" in
+    v0.43|rpdk0.43|RPDK0.43)
+        MODEL_NAME="v0.43"
+        MODEL_INC='/afs/apd/ant/cte_tech/1p4/IIMmintaka/common/pdk/IIM/SpiceModel_V0.430/Hspice/design_include.inc'
+        MODEL_LIB='/afs/apd/ant/cte_tech/1p4/IIMmintaka/common/pdk/IIM/SpiceModel_V0.430/Hspice/fixed_corner.lib'
+        echo "  Auto-resolved v0.43 (RPDK0.43 SpiceModel_V0.430)"
+        ;;
+    v0.53|tpdk0.53|TPDK0.53)
+        MODEL_NAME="v0.53"
+        MODEL_INC='/afs/apd/ant/research/prod/2HP/V0.51/Spice/design_include.inc'
+        MODEL_LIB='/afs/apd/ant/research/prod/2HP/V0.51/Spice/fixed_corner.lib'
+        echo "  Auto-resolved v0.53 (TPDK0.53 Spice-V0.51-prod)"
+        ;;
+    v0.6SB|v0p6SB)
+        MODEL_NAME="v0.6SB"
+        MODEL_INC='/afs/apd/ant/research/test/2HP/v0.53/Spice-260724-sandbox/design_include.inc'
+        MODEL_LIB='/afs/apd/ant/research/test/2HP/v0.53/Spice-260724-sandbox/fixed_corner.lib'
+        echo "  Auto-resolved v0.6SB (Spice-260724-sandbox)"
+        ;;
+    v0.6SB2|v0p6SB2)
+        MODEL_NAME="v0.6SB2"
+        MODEL_INC='/afs/apd/ant/research/test/2HP/v0.53/Spice-260604-sandbox/design_include.inc'
+        MODEL_LIB='/afs/apd/ant/research/test/2HP/v0.53/Spice-260604-sandbox/fixed_corner.lib'
+        echo "  Auto-resolved v0.6SB2 (Spice-260604-sandbox)"
+        ;;
+    *)
+        ask MODEL_INC "Path to design_include.inc" ""
+        [ -z "$MODEL_INC" ] && echo "ERROR: MODEL_INC is required for unknown model." >&2 && exit 1
+        [ ! -f "$MODEL_INC" ] && echo "ERROR: File not found: $MODEL_INC" >&2 && exit 1
+        ask MODEL_LIB "Path to fixed_corner.lib" ""
+        [ -z "$MODEL_LIB" ] && echo "ERROR: MODEL_LIB is required for unknown model." >&2 && exit 1
+        [ ! -f "$MODEL_LIB" ] && echo "ERROR: File not found: $MODEL_LIB" >&2 && exit 1
+        ;;
+esac
 
 # Warn if inc and lib are from different sandboxes
 _inc_sandbox=$(echo "$MODEL_INC" | grep -o 'Spice-[0-9]*-sandbox' || echo "")
@@ -372,7 +429,7 @@ hdr "Step 5: Temperature"
 ask TEMP_CHOICE "Temperature in °C" "25"
 echo "$TEMP_CHOICE" | grep -qE '^-?[0-9]+$' || { echo "ERROR: Temperature must be an integer." >&2; exit 1; }
 
-# ── Step 6: Track height filter (single-stage only) ────────────────
+# ── Step 6: Track height filter (single) / Chain layout inputs (chain) ─
 if [ "$SIM_MODE" = "single" ]; then
     hdr "Step 6: Track Height Filter"
     echo "$TRACK_OPTIONS" | while IFS= read -r _l; do [ -z "$_l" ] && continue
@@ -382,9 +439,19 @@ if [ "$SIM_MODE" = "single" ]; then
     read TRACK_CHOICE
     TRACK_CHOICE="${TRACK_CHOICE:-all}"
 else
-    TRACK_CHOICE="7T"
-    echo ""
-    echo "  (Chain mode: 7T cells only — skipping track height prompt)"
+    hdr "Step 6: Chain Layout Inputs"
+    _default_cell="NAND2_X1_5T_125H_RX15_F03_SLVT_B_M2"
+    _default_spf="extraction/reext_F03/NAND2_X1_5T_125H_RX15_F03_SLVT_B_M2_ported.spf"
+    ask CHAIN_CELL "Layout cell name (.SUBCKT name in SPF)" "$_default_cell"
+    ask CHAIN_SPF  "Path to ported layout SPF"              "$_default_spf"
+    # Resolve relative SPF path from workspace root
+    case "$CHAIN_SPF" in
+        /*) ;;
+        *)  CHAIN_SPF="$SCRIPTDIR/$CHAIN_SPF" ;;
+    esac
+    [ ! -f "$CHAIN_SPF" ] && echo "ERROR: SPF not found: $CHAIN_SPF" >&2 && exit 1
+    ask CHAIN_STAGES "Number of ring stages" "101"
+    echo "$CHAIN_STAGES" | grep -qE '^[0-9]+$' || { echo "ERROR: Stages must be a positive integer." >&2; exit 1; }
 fi
 
 # ── Step 7: Cell type filter (single-stage only) ───────────────────
@@ -396,8 +463,6 @@ if [ "$SIM_MODE" = "single" ]; then
     printf "  Enter cell type [all]: "
     read CELLTYPE_CHOICE
     CELLTYPE_CHOICE="${CELLTYPE_CHOICE:-all}"
-else
-    CELLTYPE_CHOICE="all"
 fi
 
 # ── Step 8: Post-run GitHub push ───────────────────────────────────
@@ -421,6 +486,10 @@ echo "  Temperature : ${TEMP_CHOICE} °C"
 if [ "$SIM_MODE" = "single" ]; then
 echo "  Track filter: $TRACK_CHOICE"
 echo "  Cell filter : $CELLTYPE_CHOICE"
+else
+echo "  Chain cell  : $CHAIN_CELL"
+echo "  Chain SPF   : $CHAIN_SPF"
+echo "  Stages      : $CHAIN_STAGES"
 fi
 echo "  GitHub push : $PUSH_CHOICE"
 echo "=============================================="
@@ -467,8 +536,8 @@ if [ "$SIM_MODE" = "single" ]; then
 
     # Git add results file and push
     if [ "$PUSH_CHOICE" = "yes" ]; then
-        _results_file="$SCRIPTDIR/PPGRO_chain_menu14_${MODEL_NAME}_${VT_CHOICE}.txt"
-        [ "$VDD_CHOICE" != "sweep" ] && _results_file="$SCRIPTDIR/PPGRO_chain_${MODEL_NAME}_${VT_CHOICE}_results.txt"
+        _results_file="$SCRIPTDIR/results/PPGRO_chain_menu14_${MODEL_NAME}_${VT_CHOICE}.txt"
+        [ "$VDD_CHOICE" != "sweep" ] && _results_file="$SCRIPTDIR/results/PPGRO_chain_${MODEL_NAME}_${VT_CHOICE}_results.txt"
         git -C "$SCRIPTDIR" add "$_results_file" index.html 2>/dev/null
         git -C "$SCRIPTDIR" diff --cached --quiet || \
             git -C "$SCRIPTDIR" commit -m "Single-stage sim results: $MODEL_NAME $VT_CHOICE VDD=$VDD_CHOICE T=${TEMP_CHOICE}C"
@@ -480,36 +549,33 @@ if [ "$SIM_MODE" = "single" ]; then
 #=============================================================================
 else
 
-    MODEL_NAME="$MODEL_NAME" \
-    MODEL_INC="$MODEL_INC" \
-    MODEL_LIB="$MODEL_LIB" \
-    VDD="$VDD_CHOICE" \
-    TEMP="$TEMP_CHOICE" \
-    ksh "$SCRIPTDIR/full_dut/PPGRO_DUT_7TINVNANDNOR_menu_sweep_v0p6SB2_slvt"
+    _chain_results="$SCRIPTDIR/results/results_dut_${MODEL_NAME}_${CHAIN_CELL}.txt"
+
+    ksh "$SCRIPTDIR/full_dut/run_ppg_dut.sh" \
+        -c "$CHAIN_CELL" \
+        -s "$CHAIN_SPF" \
+        -m "$MODEL_NAME" \
+        -i "$MODEL_INC" \
+        -l "$MODEL_LIB" \
+        -v "$VDD_CHOICE" \
+        -t "$TEMP_CHOICE" \
+        -n "$CHAIN_STAGES" \
+        -o "$_chain_results"
 
     _exit=$?
     if [ "$_exit" -ne 0 ]; then
-        echo "ERROR: Chain simulation script exited with code $_exit." >&2
+        echo "ERROR: run_ppg_dut.sh exited with code $_exit." >&2
         exit "$_exit"
     fi
 
-    # Collect and validate results
     echo ""
-    echo "Collecting chain results..."
-    MODEL_NAME="$MODEL_NAME" ksh "$SCRIPTDIR/collect_chain_and_push.sh"
-    _exit=$?
-    if [ "$_exit" -ne 0 ]; then
-        echo "ERROR: collect_chain_and_push.sh exited with code $_exit." >&2
-        exit "$_exit"
-    fi
+    echo "Results saved to: $_chain_results"
 
     # Git add chain results and push
     if [ "$PUSH_CHOICE" = "yes" ]; then
-        git -C "$SCRIPTDIR" add \
-            "$SCRIPTDIR/chain_results_${MODEL_NAME}.txt" \
-            "$SCRIPTDIR/index.html" 2>/dev/null
+        git -C "$SCRIPTDIR" add "$_chain_results" 2>/dev/null
         git -C "$SCRIPTDIR" diff --cached --quiet || \
-            git -C "$SCRIPTDIR" commit -m "Chain sim results: $MODEL_NAME SLVT VDD=${VDD_CHOICE}V T=${TEMP_CHOICE}C"
+            git -C "$SCRIPTDIR" commit -m "Chain sim results: $MODEL_NAME $CHAIN_CELL SLVT VDD=${VDD_CHOICE}V T=${TEMP_CHOICE}C"
         do_git_push
     fi
 

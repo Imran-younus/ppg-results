@@ -19,7 +19,7 @@
 #   -v, --vdd     <val|sweep>  Voltage(s) to simulate (default: 0.70, or 'sweep')
 #   -t, --temp    <degC>       Temperature in °C (default: 25)
 #   -n, --stages  <count>      Number of ring stages (default: 101)
-#   -b, --base    <path>       Base netlist (default: full_dut/PPG_ROM_cronus_base_v0p6SB2.sp)
+#   -b, --base    <path>       Base netlist (default: full_dut/PPG_ROM_base.sp)
 #   -o, --output  <path>       Output results text file
 #       --local                Run HSPICE locally instead of LSF
 #   -d, --dry-run              Generate and verify patched netlists without submitting
@@ -31,19 +31,23 @@ FULLDUTDIR="$SCRIPTDIR/full_dut"
 . "$SCRIPTDIR/ppg_sim_lib.sh"
 
 # Default values
+# Default cell = canonical 5T F03 layout. Override with -c <name>.
 CELL_NAME="${CELL_NAME:-NAND2_X1_5T_125H_RX15_F03_SLVT_B_M2}"
-SPF_PATH="${SPF_PATH:-$SCRIPTDIR/layout/NAND2_X1_5T_125H_RX15_F03_SLVT_B_M2.spf}"
+# Default SPF = re-extracted ported SPF (ENA VSS VDD RO_OUT + 4 R_PORT_* bridges, V0p42 TCAD).
+# The old layout/NAND2_*_.spf is the pre-re-extraction baseline; do not use it for new runs.
+SPF_PATH="${SPF_PATH:-$SCRIPTDIR/extraction/reext_F03/NAND2_X1_5T_125H_RX15_F03_SLVT_B_M2_ported.spf}"
 case "$SPF_PATH" in
     /*) ;;
     *)  SPF_PATH="$SCRIPTDIR/$SPF_PATH" ;;
 esac
+# Default model = v0.43. Auto-resolve also handles: v0.53, v0.6SB, v0.6SB2.
 MODEL_NAME="${MODEL_NAME:-v0.43}"
 MODEL_INC="${MODEL_INC:-}"
 MODEL_LIB="${MODEL_LIB:-}"
 VDD_INPUT="${VDD:-0.70}"
 TEMP="${TEMP:-25}"
 STAGES="${STAGES:-101}"
-BASESP="${BASESP:-$FULLDUTDIR/PPG_ROM_cronus_base_v0p6SB2.sp}"
+BASESP="${BASESP:-$FULLDUTDIR/PPG_ROM_base.sp}"
 OUTPUT="${OUTPUT:-}"
 USE_LSF=1
 DRY_RUN=0
@@ -121,11 +125,13 @@ else
 fi
 
 RUNBASE="$FULLDUTDIR/run_dut_${MODEL_NAME}_${CELL_NAME}"
-RESULTS="${OUTPUT:-$FULLDUTDIR/results_dut_${MODEL_NAME}_${CELL_NAME}.txt}"
+# Results go to results/ dir by default; override with -o <path>
+RESULTS="${OUTPUT:-$SCRIPTDIR/results/results_dut_${MODEL_NAME}_${CELL_NAME}.txt}"
 NETLIST='invfo3_mod.sp'
 LSF_JOBPREFIX="DUT_${MODEL_NAME}"
 
 mkdir -p "$RUNBASE"
+mkdir -p "$SCRIPTDIR/results"
 
 echo "=============================================================================="
 echo " PPG Full DUT Ring Oscillator Simulation Flow"
