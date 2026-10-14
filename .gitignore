@@ -1,0 +1,60 @@
+# AFS workspace — simulation scripts, netlists, run dirs stay on AFS only.
+# The git repo is a GitHub Pages dashboard: only index.html, ppg_results.html,
+# .nojekyll, NOTES.md, results/*.txt, and verify_dataset_consistency.js belong here.
+
+# Bob agent files
+.bob/artifacts/
+.bob/commands/
+.bob/skills/
+
+# Run directories (single-stage and chain) — can be hundreds of GB
+rundirs/
+run_vdd_*/
+full_dut/run/
+full_dut/run_dut_*/
+
+# Simulation scripts and netlists
+*.sh
+*.sp
+*.spf
+*.py
+
+# HSPICE outputs
+*.lis
+*.dp0
+*.ic0
+*.tr0
+*.mt0
+*.pa0
+*.st0
+
+# Legacy scripts directory
+scripts/
+
+# Archive
+archive/
+
+# Extraction and layout directories
+extraction/
+layout/
+
+# Result/menu text files at root level (canonical copies live in results/)
+PPGRO_chain_menu14*.txt
+chain_results_*.txt
+PPG_delaychain_menu_*
+PPGRO_chain_menu*
+run_v0p6SB2*.log
+
+# Misc
+hsp_2022_new
+invfo3_mod.sp
+slvt_monitor.sh
+sim_monitor.sh
+star_cmd
+star_setup
+setup.icv
+runLvsPex
+clean_hsp_files
+
+# Full DUT chain directory — scripts and netlists, AFS only
+full_dut/

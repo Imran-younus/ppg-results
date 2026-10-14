@@ -1143,3 +1143,31 @@ ksh run_ppg_sim.sh --chain --cell <layout cell> [--lib test_C18mintaka_PPG_ROs] 
 - `run_vdd_sweep.sh` — `OUTPUT` default updated to `results/PPGRO_chain_menu14_<MODEL>_<VT>.txt`
 
 **Rule:** All future result files must go to `results/`. Override with `-o <path>` in `run_ppg_dut.sh` or `OUTPUT=<path>` env var if a custom location is needed.
+
+---
+
+## Issue 42 — Simulation output directories moved to rundirs/ (2026-10-14)
+
+**Change:** Created `rundirs/` at workspace root. All simulation run directories moved there.
+
+**Moved:**
+- `run_vdd_v0.43_slvt/`, `run_vdd_v0.53_slvt/`, `run_vdd_v0p6SB_slvt/`, `run_vdd_v0p6SB2_slvt/` → `rundirs/`
+- `full_dut/run_dut_*/`, `full_dut/run/` → `rundirs/full_dut/`
+
+**Scripts updated:**
+- `archive/run_ppg_sim.sh` — `RUNDIR` → `rundirs/run_vdd_<MODEL>_<VT>/`
+- `full_dut/run_ppg_dut.sh` — `RUNBASE` → `rundirs/full_dut/run_dut_<MODEL>_<CELL>/`; adds `mkdir -p rundirs/full_dut`
+- `ppg_run.sh` — troubleshooting comment paths updated
+
+**Workspace layout going forward:**
+```
+rundirs/
+  run_vdd_<MODEL>_<VT>/         ← single-stage sweep run dirs (one per model/vt)
+    <vdd_tag>/<cell>/            ← per-VDD per-cell dirs with invfo3_mod.sp, .lis, run_hsp.sh
+  full_dut/
+    run_dut_<MODEL>_<CELL>/      ← chain run dirs
+      <vdd_tag>/                 ← per-VDD with invfo3_mod.sp, .lis, run_hsp.sh
+results/                         ← all result .txt files (Issue 41)
+```
+
+**Rule:** Never move or rename an active `rundirs/run_vdd_*/` directory — the `.sp.lis` files inside are the only copies of all simulation results. Regression tests reference `rundirs/run_vdd_v0.6SB_slvt/` and `rundirs/run_vdd_v0p6SB2_slvt/`.
