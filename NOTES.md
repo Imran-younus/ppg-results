@@ -1171,3 +1171,27 @@ results/                         ← all result .txt files (Issue 41)
 ```
 
 **Rule:** Never move or rename an active `rundirs/run_vdd_*/` directory — the `.sp.lis` files inside are the only copies of all simulation results. Regression tests reference `rundirs/run_vdd_v0.6SB_slvt/` and `rundirs/run_vdd_v0p6SB2_slvt/`.
+
+---
+
+## Issue 43 — Git repo cleaned up: website assets only (commit 8b94574, 2026-10-14)
+
+**Problem:** The git repo had thousands of wrongly-tracked files (~1.4 GB): all of `rundirs/` (1,344 `.sp.lis` files), `archive/`, `scripts/`, simulation scripts (`run_ppg_sim.sh`, `ppg_sim_lib.sh`, `ppg_run.sh`, `invfo3_base.sp`, etc.), and stale legacy files.
+
+**Fix:**
+1. `git rm --cached -r` to strip all non-website files from the index (44 files)
+2. Created `.gitignore` to prevent any re-addition of scripts/netlists/rundirs
+3. Committed and pushed as `8b94574`
+
+**What git now tracks (complete list):**
+- `.gitignore`, `.nojekyll`, `.bob/custom_modes.yaml`
+- `NOTES.md`
+- `index.html`, `ppg_results.html`
+- `verify_dataset_consistency.js`
+- `results/` — 10 result `.txt` files
+
+**`.gitignore` exclusions:** `rundirs/`, `run_vdd_*/`, `full_dut/`, `archive/`, `scripts/`, `extraction/`, `layout/`, `*.sh`, `*.sp`, `*.spf`, `*.py`, `*.lis`, `*.dp0`, `*.tr0`, `*.mt0`, `*.pa0`, `*.st0`, PPGRO_chain_menu14* at root, hsp_2022_new, invfo3_mod.sp, etc.
+
+**Rule:** The GitHub repo is a GitHub Pages dashboard ONLY. Never `git add` simulation scripts, netlists, or run directories. Always stage files explicitly by name. Run `node verify_dataset_consistency.js` on both HTML files before every push.
+
+**Live site verified:** `curl` returned 6 `registerDataset` calls on both `index.html` and `ppg_results.html` after push — all model datasets intact.
