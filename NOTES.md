@@ -999,3 +999,83 @@ ksh run_ppg_sim.sh --chain --cell <layout cell> [--lib test_C18mintaka_PPG_ROs] 
 - Ask the layout owner (shirina) whether the pcell library `genFill` (`/gpfs/projects/c/c18/mintaka/usr/shirina/icl/C18mintaka_SA_pcells/work/cds/genFill/layout/layout.oa`, edited 2026-10-14 13:14) changed. SUSPECTED cause of the fresh-LVS failure, unconfirmed (Issue 34). Do not re-run F03 extraction until the user asks.
 - The validated `extraction/reext_F03/..._ported.spf` is the F03 reference; use it with `--spf` for any F03 chain run.
 - Rule reminder: when the user asks only for code/flow checks, use `ksh -n`/`bash -n`, stubs and `-d`; never start extraction, LVS, StarRC, HSPICE or LSF.
+
+---
+
+## Issue 36 — Workspace cleanup: archive/ directory (2026-10-14)
+
+**Action:** Moved 13 stale/superseded items to `archive/` to keep the workspace root clean.
+
+**Files moved to `archive/`:**
+- `run_v0p6SB2_slvt_vdd_sweep.log` — 54 MB stale stdout log
+- `PPG_delaychain_menu_VDD_sweep_v0p6SB_slvt_new`, `..._ulvt_new`, `PPG_delaychain_menu_sweep_v0p6SB_ulvt_new` — legacy hardcoded sweep scripts, superseded by `ppg_run.sh`
+- `slvt_monitor.sh` — hardcoded monitor for deleted `run_vdd_slvt/` directory, broken
+- `clean_hsp_files` — old cleanup script, superseded by Issue 13 runbook
+- `collect_chain.log` — stale broken-run log
+- `archive_v0p6SB_ulvt/`, `scripts/` — old archives with superseded scripts
+- `runLvsPex`, `setup.icv`, `star_cmd`, `star_setup` — extraction-only tools, extraction complete
+
+**Rule:** The four `run_vdd_*/` directories (1.4 GB total, 336 `.sp.lis` each) must NEVER be deleted — they are the only copies of all simulation results. All binaries (`*.dp0`, `*.tr0`, etc.) were already deleted in the Issue 13 cleanup.
+
+---
+
+## Issue 37 — `ppg_run.sh` chain mode called wrong script; fixed to use `run_ppg_dut.sh` (2026-10-14)
+
+**Symptom:** `ppg_run.sh` chain mode called `full_dut/PPGRO_DUT_7TINVNANDNOR_menu_sweep_v0p6SB2_slvt` (old hardcoded script) then `collect_chain_and_push.sh` (broken, Issue 23). No interactive prompts for cell name or SPF path. Model paths were always asked interactively even for known models (v0.43/v0.53/v0.6SB/v0.6SB2).
+
+**Fix:**
+1. Step 2 (model parameters): added auto-resolve for all 4 known models — no INC/LIB prompts needed.
+2. Step 6 (chain mode): replaced hardcoded "7T cells only" skip with interactive prompts for:
+   - Cell name (default `NAND2_X1_5T_125H_RX15_F03_SLVT_B_M2`)
+   - SPF path (default `extraction/reext_F03/..._ported.spf`), with relative-path resolution and existence check
+   - Stages (default `101`)
+3. Confirmation summary: shows chain-specific inputs when mode = chain.
+4. RUN block: calls `full_dut/run_ppg_dut.sh` with all collected flags (`-c`, `-s`, `-m`, `-i`, `-l`, `-v`, `-t`, `-n`, `-o`). Removed `PPGRO_DUT_*` and `collect_chain_and_push.sh` calls.
+5. `run_ppg_sim.sh` moved to `archive/` — `ppg_run.sh` is now the single interactive entry point.
+
+**Rule:** Always use `ksh ppg_run.sh` for interactive runs. Chain mode defaults work for the 5T F03 cell with any of the 4 known models.
+
+---
+
+## Issue 38 — Chain base netlist hostname path mismatch: v0.53/v0.6SB blocks missing from `full_dut/PPG_ROM_base.sp` (2026-10-14)
+
+**Symptom:** `verify_model` error: "No active design_include.inc" when running chain sim with TPDK0.53. Dry run exits 1 immediately after `patch_netlist`.
+
+**Root cause:** `full_dut/PPG_ROM_base.sp` (previously named `PPG_ROM_cronus_base_v0p6SB2.sp`) had the v0.51 prod block at lines 51–52 using `/afs/apd.pok.ibm.com/ant/...` (with hostname). `MODEL_INC` for TPDK0.53 resolves to `/afs/apd/ant/...` (without hostname). `patch_netlist` does an exact substring match — it never found the block to uncomment. Also, the v0.6SB block (`Spice-260724-sandbox`) was entirely absent.
+
+**Comparison:**
+- `invfo3_base.sp` (single-stage) had the correct `/afs/apd/ant/...` paths at lines 115–116 → single-stage worked
+- `full_dut/PPG_ROM_base.sp` only had `/afs/apd.pok.ibm.com/ant/...` → chain failed
+
+**Fix:** Added two new commented blocks to `full_dut/PPG_ROM_base.sp` before the active v0.6SB2 block:
+```
+* TPDK0.53 model (v0.53 Titan PDK uses V0.51 LVS/SPICE, prod release Jan 2026)
+*.inc '/afs/apd/ant/research/prod/2HP/V0.51/Spice/design_include.inc'
+*.lib /afs/apd/ant/research/prod/2HP/V0.51/Spice/fixed_corner.lib TT
+
+* v0.6SB model (Spice-260724-sandbox)
+*.inc '/afs/apd/ant/research/test/2HP/v0.53/Spice-260724-sandbox/design_include.inc'
+*.lib /afs/apd/ant/research/test/2HP/v0.53/Spice-260724-sandbox/fixed_corner.lib TT
+```
+
+**Verified:** Dry run with `-m v0.53` now passes. Patched netlist shows exactly one active `.inc`/`.lib` pair from `prod/2HP/V0.51/Spice/`.
+
+**Rule:** Whenever adding a new model block to either base netlist (`invfo3_base.sp` or `full_dut/PPG_ROM_base.sp`), add it to BOTH files and use the `/afs/apd/ant/...` path format (without hostname). Never use `/afs/apd.pok.ibm.com/ant/...`.
+
+---
+
+## Issue 39 — Script renames for model/cell agnosticism (2026-10-14)
+
+**Problem:** Three script/netlist filenames contained hardcoded model or cell names, making it confusing to use them for other models.
+
+**Renames performed:**
+
+| Old name | New name | References updated |
+|---|---|---|
+| `run_v0p6SB2_slvt_vdd_sweep.sh` | `run_vdd_sweep.sh` | None (nothing called it by name) |
+| `full_dut/run_dut_f03.sh` | `full_dut/run_dut.sh` | Internal `BASESP` path |
+| `full_dut/PPG_ROM_cronus_base_v0p6SB2.sp` | `full_dut/PPG_ROM_base.sp` | `run_ppg_dut.sh` (comment + default), `run_dut.sh` |
+
+**Rule:** Script filenames must be model/cell agnostic. Result `.txt` files and run directories may (and should) contain model/cell names for provenance. The `run_hsp.sh` files inside run directories are generated artifacts — their name is fixed as `run_hsp.sh` by `ppg_sim_lib.sh` and must not change.
+
+**Regression:** `ksh -n` syntax check passed on all 3 renamed scripts. Dry run with v0.53 + F03 SPF confirmed `PPG_ROM_base.sp` is found and patched correctly.

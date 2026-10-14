@@ -1020,7 +1020,14 @@ registerDataset({
   cells: ['6TSL_INV','6TSL_NAND2B','6TSL_NOR2B','6TSL_NAND3B','6TSL_AOI21','6TSL_AOI22','6TSL_OAI21','6TSL_OAI22',
           '7TSL_INV','7TSL_NAND2B','7TSL_NOR2B','7TSL_NAND3B','7TSL_AOI21','7TSL_AOI22','7TSL_OAI21','7TSL_OAI22',
           '8TSL_INV','8TSL_NAND2B','8TSL_NOR2B','8TSL_NAND3B','8TSL_AOI21','8TSL_AOI22','8TSL_OAI21','8TSL_OAI22'],
-  // chain_meta and chain_cells omitted — chain sims not yet run for this model
+  chain_meta: {
+    vt:'5T SLVT (C18mintaka)', stages:101, vdd:'0.70 V', corner:'TT', temp:'25 °C',
+    simulator:'HSPICE T-2022.06-SP2', model:'TPDK0.53 (Spice-V0.51-prod)',
+    scalable_metrics:['stage_delay','ceff','iddq'],
+  },
+  chain_cells: [
+    {label:'5T_NAND2_F03', stage_delay:13.80820, ceff:2.06062, acreff:6.70100, iddq:3.66357},
+  ],
 });
 rr('v0p53_SLVT_TT','6TSL_INV','stage_delay',[1.20962e+01,1.02477e+01,8.99527,8.08815,7.41313,6.90011,6.49362,6.17679,5.91352,5.70361,5.52908,5.38447,5.26880,5.16652]);
 rr('v0p53_SLVT_TT','6TSL_INV','iddq',[4.72122e-09,5.04596e-09,5.39568e-09,5.76761e-09,6.16729e-09,6.60583e-09,7.09433e-09,7.64389e-09,8.26006e-09,8.98726e-09,9.84768e-09,1.09024e-08,1.22569e-08,1.39999e-08]);
