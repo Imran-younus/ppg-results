@@ -26,6 +26,19 @@
 #   -o, --output       Output results file path (optional)
 #   -d, --dry-run      Generate netlists/wrappers without submitting LSF jobs
 #   -c, --collect-only Collect results from existing .sp.lis files; skip setup/submit/wait
+#
+# Chain mode (full DUT 101-stage ring, any VDD): delegates to full_dut/run_ppg_dut.sh
+#   ksh run_ppg_sim.sh --chain --cell <layout cell> [--lib <cds lib>] [--spf <layout.spf>] -m <model> [-v <vdd|list|sweep>] [-t <temp>] [--stages 101] [-o <results>] [-d]
+#   --chain            Select chain mode (default mode is the single-stage 24-cell sweep)
+#   --cell <name>      Layout cell name in the CTE/Cadence library (env PPG_CELL if omitted). Must equal the SPF .SUBCKT name.
+#   --lib  <name>      Cadence library of that cell, as defined in extraction/cds.lib (env PPG_LIB, default test_C18mintaka_PPG_ROs)
+#   --spf  <path>      Ported layout SPF ('ENA VSS VDD RO_OUT' + 4 R_PORT_* bridges). If omitted:
+#                        1. reuse extraction/ext_<cell>/<cell>_ported.spf if it exists (force a new extraction: --re-extract)
+#                        2. else run extraction/run_chain_extract.sh <cell> <lib>  (oasisout, si/CDL, ICV LVS, StarRC V0p42, port bridging)
+#                      With -d the extraction is only PLANNED (read-only library check), never run.
+#   --stages <n>       Ring stages (default 101)
+#   In chain mode -v defaults to 0.70 (NOT a sweep). v0.43/v0.53/v0.6SB/v0.6SB2 resolve -i/-l automatically.
+#   Test hooks: PPG_EXTRACT_SCRIPT / PPG_DUT_SCRIPT override the two delegated scripts (used for stub testing).
 #=============================================================================
 
 SCRIPTDIR=$(cd "$(dirname "$0")" && pwd)
@@ -34,8 +47,20 @@ SCRIPTDIR=$(cd "$(dirname "$0")" && pwd)
 # ── Parse CLI arguments (overrides env vars) ────────────────────────
 DRY_RUN=0
 COLLECT_ONLY=0
+CHAIN=0
+CHAIN_CELL="${PPG_CELL:-}"
+CHAIN_LIB="${PPG_LIB:-test_C18mintaka_PPG_ROs}"
+CHAIN_SPF=""
+CHAIN_STAGES=""
+RE_EXTRACT=0
 while [ $# -gt 0 ]; do
     case "$1" in
+        --chain)         CHAIN=1;         shift 1 ;;
+        --cell)          CHAIN_CELL="$2"; shift 2 ;;
+        --lib)           CHAIN_LIB="$2";  shift 2 ;;
+        --re-extract)    RE_EXTRACT=1;    shift 1 ;;
+        --spf)           CHAIN_SPF="$2";  shift 2 ;;
+        --stages)        CHAIN_STAGES="$2"; shift 2 ;;
         -m|--model-name) MODEL_NAME="$2"; shift 2 ;;
         -i|--model-inc)  MODEL_INC="$2";  shift 2 ;;
         -l|--model-lib)  MODEL_LIB="$2";  shift 2 ;;
@@ -57,11 +82,106 @@ while [ $# -gt 0 ]; do
             echo "  -o, --output     <path>   Output results file"
             echo "  -d, --dry-run             Prepare files without LSF submit"
             echo "  -c, --collect-only        Collect from existing .sp.lis; skip setup/submit/wait"
+            echo "Chain mode (full DUT ring, delegates to full_dut/run_ppg_dut.sh):"
+            echo "  --chain --cell <layout cell> [--lib <cds lib>] [--spf <layout.spf>] [--re-extract] [--stages 101] [-m -i -l -v -t -o -d]"
+            echo "  (no --spf: reuse extraction/ext_<cell>/<cell>_ported.spf or run extraction/run_chain_extract.sh)"
             exit 0
             ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
 done
+
+# ── Chain mode: full DUT 101-stage ring at any VDD (NOTES.md Runbook B) ──
+if [ "$CHAIN" -eq 1 ]; then
+    EXTRACT_SCRIPT="${PPG_EXTRACT_SCRIPT:-$SCRIPTDIR/extraction/run_chain_extract.sh}"
+    DUT_SCRIPT="${PPG_DUT_SCRIPT:-$SCRIPTDIR/full_dut/run_ppg_dut.sh}"
+    if [ -z "$CHAIN_CELL" ]; then
+        echo "ERROR: --chain requires --cell <layout cell> (or export PPG_CELL)" >&2
+        exit 1
+    fi
+    if [ -z "$CHAIN_SPF" ]; then
+        # No SPF given: reuse a previous extraction or extract from the CTE library
+        CHAIN_SPF="$SCRIPTDIR/extraction/ext_${CHAIN_CELL}/${CHAIN_CELL}_ported.spf"
+        if [ -s "$CHAIN_SPF" ] && [ "$RE_EXTRACT" -eq 0 ]; then
+            echo "Reusing existing ported SPF: $CHAIN_SPF (use --re-extract to rebuild)"
+        else
+            # Read-only library check: cell must exist with BOTH layout and schematic views
+            _lib_dir=$(grep "^DEFINE $CHAIN_LIB " "$SCRIPTDIR/extraction/cds.lib" 2>/dev/null | awk '{print $3}')
+            if [ -z "$_lib_dir" ] || [ ! -d "$_lib_dir" ]; then
+                echo "ERROR: library '$CHAIN_LIB' is not defined in $SCRIPTDIR/extraction/cds.lib (or its directory is missing)." >&2
+                exit 1
+            fi
+            if [ ! -f "$_lib_dir/$CHAIN_CELL/layout/layout.oa" ] || [ ! -f "$_lib_dir/$CHAIN_CELL/schematic/sch.oa" ]; then
+                echo "ERROR: cell '$CHAIN_CELL' needs both layout/layout.oa and schematic/sch.oa in $_lib_dir." >&2
+                echo "       Cells with both views (5T family):" >&2
+                for _c in "$_lib_dir"/*_5T_*; do
+                    [ -f "$_c/layout/layout.oa" ] && [ -f "$_c/schematic/sch.oa" ] && echo "         $(basename "$_c")" >&2
+                done
+                exit 1
+            fi
+            echo "Cell '$CHAIN_CELL' found in library '$CHAIN_LIB' ($_lib_dir): layout + schematic views present."
+            if [ "$DRY_RUN" -eq 1 ]; then
+                echo "DRY RUN - no SPF supplied/found, extraction NOT run. Plan:"
+                echo "  1. bash $EXTRACT_SCRIPT $CHAIN_CELL $CHAIN_LIB"
+                echo "       schCheck sub-cells -> si/CDL -> oasisout -> ICV LVS (gate: no unmatched devices/nets)"
+                echo "       -> StarRC RPDK0.43 V0p42 (TCAD gate) -> add ports + 4 R_PORT_* from LVS net table"
+                echo "       -> $CHAIN_SPF"
+                echo "  2. ksh $DUT_SCRIPT -c $CHAIN_CELL -s $CHAIN_SPF -m ${MODEL_NAME:-<model>} -v ${VDD:-0.70} ..."
+                exit 0
+            fi
+            echo "No ported SPF for '$CHAIN_CELL' - running extraction (takes several minutes; output below)."
+            _ext_log="$SCRIPTDIR/extraction/ext_${CHAIN_CELL}.log"
+            # pipeline status is tee's; success is judged by the PORTED_SPF= line + file below
+            bash "$EXTRACT_SCRIPT" "$CHAIN_CELL" "$CHAIN_LIB" 2>&1 | tee "$_ext_log"
+            _ported=$(grep '^PORTED_SPF=' "$_ext_log" | tail -1 | cut -d= -f2-)
+            if [ -z "$_ported" ] || [ ! -s "$_ported" ]; then
+                echo "ERROR: extraction did not produce a ported SPF - see $_ext_log (last error above). Not simulating." >&2
+                exit 1
+            fi
+            CHAIN_SPF="$_ported"
+        fi
+    fi
+    case "$CHAIN_SPF" in /*) ;; *) CHAIN_SPF="$SCRIPTDIR/$CHAIN_SPF" ;; esac
+    if [ ! -f "$CHAIN_SPF" ]; then
+        echo "ERROR: layout SPF not found: $CHAIN_SPF" >&2
+        exit 1
+    fi
+    # Port guard (Issue 33): .SUBCKT must end in 'ENA VSS VDD RO_OUT' and have 4 R_PORT_* bridges
+    if ! grep -m1 -i '^\.SUBCKT' "$CHAIN_SPF" | grep -q "^\.SUBCKT $CHAIN_CELL ENA VSS VDD RO_OUT[ ]*"'$'; then
+        echo "ERROR: $CHAIN_SPF first .SUBCKT is not '.SUBCKT $CHAIN_CELL ENA VSS VDD RO_OUT':" >&2
+        echo "       $(grep -m1 -i '^\.SUBCKT' "$CHAIN_SPF")" >&2
+        echo "       Add ports + R_PORT_* bridges per NOTES.md Issue 33 / Runbook B." >&2
+        exit 1
+    fi
+    if [ "$(grep -c '^R_PORT_' "$CHAIN_SPF")" -ne 4 ]; then
+        echo "ERROR: $CHAIN_SPF must contain exactly 4 R_PORT_* bridges (found $(grep -c '^R_PORT_' "$CHAIN_SPF"))." >&2
+        exit 1
+    fi
+    _tcad=$(grep -m1 'TCAD_GRD_FILE' "$CHAIN_SPF" | awk '{print $NF}')
+    echo "SPF TCAD: $_tcad"
+    # Issue 29: parasitics must match the model. Explicit SPF_TCAD_EXPECT wins; else known default for RPDK0.43.
+    _tcad_exp="$SPF_TCAD_EXPECT"
+    if [ -z "$_tcad_exp" ]; then
+        case "${MODEL_NAME:-v0.43}" in v0.43|rpdk0.43|RPDK0.43) _tcad_exp="V0p42" ;; esac
+    fi
+    if [ -n "$_tcad_exp" ]; then
+        case "$_tcad" in
+            *"$_tcad_exp"*) ;;
+            *) echo "ERROR: SPF TCAD header does not contain '$_tcad_exp' (model ${MODEL_NAME:-v0.43}); wrong parasitics for this model (Issue 29)." >&2
+               exit 1 ;;
+        esac
+    fi
+    set -- -c "$CHAIN_CELL" -s "$CHAIN_SPF"
+    [ -n "$MODEL_NAME" ]    && set -- "$@" -m "$MODEL_NAME"
+    [ -n "$MODEL_INC" ]     && set -- "$@" -i "$MODEL_INC"
+    [ -n "$MODEL_LIB" ]     && set -- "$@" -l "$MODEL_LIB"
+    [ -n "$VDD" ]           && set -- "$@" -v "$VDD"
+    [ -n "$TEMP" ]          && set -- "$@" -t "$TEMP"
+    [ -n "$CHAIN_STAGES" ]  && set -- "$@" -n "$CHAIN_STAGES"
+    [ -n "$OUTPUT" ]        && set -- "$@" -o "$OUTPUT"
+    [ "$DRY_RUN" -eq 1 ]    && set -- "$@" -d
+    exec ksh "$DUT_SCRIPT" "$@"
+fi
 
 # ── Defaults & Configuration ────────────────────────────────────────
 # collect-only mode: MODEL_INC/LIB not needed — skip validation
