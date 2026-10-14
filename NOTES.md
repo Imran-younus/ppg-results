@@ -1079,3 +1079,49 @@ ksh run_ppg_sim.sh --chain --cell <layout cell> [--lib test_C18mintaka_PPG_ROs] 
 **Rule:** Script filenames must be model/cell agnostic. Result `.txt` files and run directories may (and should) contain model/cell names for provenance. The `run_hsp.sh` files inside run directories are generated artifacts — their name is fixed as `run_hsp.sh` by `ppg_sim_lib.sh` and must not change.
 
 **Regression:** `ksh -n` syntax check passed on all 3 renamed scripts. Dry run with v0.53 + F03 SPF confirmed `PPG_ROM_base.sp` is found and patched correctly.
+
+---
+
+## Issue 40 — Adding chain data to the website for a new model or cell (procedure, 2026-10-14)
+
+**When:** A new full DUT chain sim completes successfully (exit 0, numeric metrics, 0 `failed`).
+
+**How to add chain data to the website (hand-edit, no script):**
+
+1. Confirm the result file: `cat full_dut/results_dut_<model>_<cell>.txt` — verify numeric values.
+2. Confirm 0 `failed`: `grep -c "failed" full_dut/run_dut_<model>_<cell>/<vdd_tag>/invfo3_mod.sp.lis`
+3. Open `index.html` and `ppg_results.html`. Find the target dataset by `id` (e.g. `v0p53_SLVT_TT`).
+4. Replace the placeholder comment:
+   ```javascript
+   // chain_meta and chain_cells omitted — chain sims not yet run for this model
+   ```
+   with:
+   ```javascript
+   chain_meta: {
+     vt:'5T SLVT (C18mintaka)', stages:101, vdd:'0.70 V', corner:'TT', temp:'25 °C',
+     simulator:'HSPICE T-2022.06-SP2', model:'<dataset name>',
+     scalable_metrics:['stage_delay','ceff','iddq'],
+   },
+   chain_cells: [
+     {label:'<cell_label>', stage_delay:<val>, ceff:<val>, acreff:<val>, iddq:<val>},
+   ],
+   ```
+   Where `<cell_label>` = short name (e.g. `5T_NAND2_F03`), values from the results file.
+   `chain_meta.model` MUST match `dataset.model` exactly.
+5. Do the same edit in BOTH `index.html` and `ppg_results.html`.
+6. Run: `node verify_dataset_consistency.js index.html` and `node verify_dataset_consistency.js ppg_results.html` — both must show `✅ All consistency validations PASSED`.
+7. `git add index.html ppg_results.html` (never `git add .`)
+8. `git commit -m "Add <model> <cell> chain data (<vdd>V) to <dataset_id>"`
+9. Token push (see GitHub push procedure above).
+10. `curl` the live site to confirm `<cell_label>` appears.
+11. Remind user to hard-refresh (Ctrl+Shift+R, Issue 18).
+
+**Adding a second chain cell to an existing dataset:** append another `{label:..., ...}` row to `chain_cells` in both files. Re-run consistency checks. Re-push.
+
+**Adding chain data for a brand-new model** (no dataset yet): run the single-stage sweep first, register with `add_dataset_to_html.py`, then follow this procedure for chain data.
+
+**Published TPDK0.53 chain data (added 2026-10-14):**
+| Model / cell | VDD | stage_delay ps | ceff fF | acreff kOhm | iddq_stage nA |
+|---|---|---|---|---|---|
+| TPDK0.53 `5T_NAND2_F03` | 0.70 V | 13.80820 | 2.06062 | 6.70100 | 3.66357 |
+(SPF: RPDK0.43 `V0p42` parasitics, same layout as RPDK0.43 chain — intentional model-only comparison)
