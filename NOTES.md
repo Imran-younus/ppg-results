@@ -4,6 +4,57 @@ This file exists so that bugs already diagnosed and fixed are not re-investigate
 from scratch in new sessions.  Update this whenever a new root cause is found.
 
 ---
+## START HERE — which kind of simulation was requested? (added 2026-10-14)
+
+There are TWO different simulation requests. Never mix their scripts, run dirs, result files or website fields.
+
+| | **A. Single-stage VDD sweep** | **B. Full DUT 101-stage chain** |
+|---|---|---|
+| Typical wording | "run model X", "single stage", "24 cells", "VDD sweep for TPDK/RPDK" | "chain", "full DUT", "101 stage", "ring oscillator", "NAND2_F03 / layout SPF", "at 0.7 V" |
+| What is simulated | 24 cells (6/7/8TSL x INV,NAND2B,NOR2B,NAND3B,AOI21,AOI22,OAI21,OAI22), one stage | ONE extracted layout ring (enable NAND2 + 100 INV + buffer), 101 stages |
+| Voltages | normally 14-point sweep 0.50-1.15 V (336 jobs) | ANY: one VDD (default 0.70), a list, or `sweep`. Do not assume 14 points; do not assume 0.70 either - take what the user asked |
+| Parasitics | `SPFDIR` of per-cell `PPG1_*` SPFs (Issue 21) | ONE layout SPF of the whole ring (`-s`), ports must be bridged (Issue 33) |
+| Script | `run_ppg_sim.sh` | `full_dut/run_ppg_dut.sh` (NOT `collect_chain_and_push.sh`, Issue 23; NOT `full_dut/PPGRO_DUT_...sweep...`, hardcoded) |
+| Run dir | `run_vdd_<model>_slvt/<vdd_tag>/<cell>/` | `full_dut/run_dut_<model>_<cellname>/<vdd_tag>/` |
+| Result file | `PPGRO_chain_menu14_<model>_slvt.txt` | `full_dut/results_dut_<model>_<cellname>.txt` (or `-o`) |
+| Metrics | stage_delay, iddq, iddarail, acceff, acreff | stage_delay, stage_freq, idda, iddq_stage, ceff, acreff |
+| Website | `registerDataset(...)` via `add_dataset_to_html.py`; no chain fields (Issue 17/24) | `chain_cells` row inside the SAME model's dataset (`v0p43_SLVT_TT`) + `chain_meta`; edited by hand (no script) |
+| Success | exit 0 and no `.missing` | `.lis` exists for every VDD, 0 `failed`, numeric stage_delay/ceff/acreff/iddq_stage |
+
+If the request is ambiguous (e.g. just "run v0.43"), ask which of A or B. "chain at 0.7 V" is B, not a one-point A.
+
+### Runbook A — single-stage VDD sweep (summary; full text in "Runbook — single-stage sweep" below, Issues 21/27/29)
+1. Model row from Issue 21 table (MODEL_NAME, MODEL_INC, MODEL_LIB, SPFDIR, SPF_TCAD_EXPECT). Unknown model -> ask.
+2. `ls` the model files and `$SPFDIR/PPG1_INV_X2_7TSL.spf`; `grep -m1 TCAD_GRD_FILE` it. `fs lq .` < 70% (Issue 28).
+3. Pre-flight: Issue 27 (24/24 SPF port order) + Issue 29 (extraction vs model). Dry run `ksh run_ppg_sim.sh -d`.
+4. `export` all five vars; run `ksh run_ppg_sim.sh` in background (`-v 0.70` for a single point); poll `bjobs | grep PPG_<model>`.
+5. Exit 0 required; else read `<results>.missing`, fix (Issues 1/5/19), retry with `CELL_FILTER`.
+6. `python3 add_dataset_to_html.py --results ... --id ... --name "..." [--replace]`; then `node verify_dataset_consistency.js` on index.html AND ppg_results.html.
+7. GITHUB GATE (ask user), explicit `git add`, token push, curl live site, remind hard refresh (Issue 18). Cleanup binaries (Issue 13).
+
+### Runbook B — full DUT 101-stage chain at any VDD (validated 2026-10-14, v0.43 F03 @ 0.70 V)
+1. **Collect inputs:** model (`v0.43`, `v0.53`, `v0.6SB`, `v0.6SB2` auto-resolve inside the script; others need `-i/-l`), layout SPF path (`-s`), cell name (`-c`, must equal the SPF `.SUBCKT` name), VDD (`-v 0.70` | `-v "0.6 0.7 0.8"` | `-v sweep`), temp (`-t`, default 25), stages (`-n`, default 101). Ask the user only for what is missing.
+2. **SPF pre-flight (mandatory, this is where chain runs fail):**
+   - `grep -n "^\.SUBCKT\|^R_PORT\|^\.ENDS" <spf>` -> must show `.SUBCKT <cell> ENA VSS VDD RO_OUT` and four `R_PORT_* <port> <node> 1u` lines. The base netlist instantiates `XRO1 RO_ENA PSS PDD RO_OUT <cell>`, i.e. port order ENA, VSS, VDD, RO_OUT.
+   - A fresh StarRC SPF has NO ports. Derive the 4 nets from the LVS `.LVS_ERRORS` "schematic port nets equated to layout non-port nets" table (VSS!, VDD!, RO_ENA, RO_OUT -> net numbers), pick the most referenced `<net>:<id>` node of each, append the bridges (Issue 33). Never copy node names from an older SPF.
+   - `grep -m1 TCAD_GRD_FILE <spf>` must match the model (RPDK0.43 -> `V0p42`), Issue 29.
+3. **Dry run:** `ksh full_dut/run_ppg_dut.sh -c <cell> -s <spf> -m <model> -v <vdd> -d`. Check the patched `invfo3_mod.sp`: one `.inc`/`.lib` pair of the intended model (not the Spice-260724 sandbox lines left in the base file's comments), `.inc '<spf>'` points at the intended SPF, `XRO1 ... <cell>`.
+4. **Old results:** the run dir `full_dut/run_dut_<model>_<cell>/` is reused and overwritten. If earlier results must be kept, `mv` the dir and results file first (done for `..._F03_prereext`).
+5. **Run in background** (LSF, `-R select[...]` is built in): `(ksh full_dut/run_ppg_dut.sh ... -o <results> > run.log 2>&1 &)`; poll `bjobs | grep DUT_<model>`; typical 0.70 V job takes ~1-3 min. Jobs for different VDDs are independent LSF jobs, so a list/sweep already runs in parallel.
+6. **Locate outputs correctly:** the vdd tag is the literal string with `.`->`_`: `-v 0.70` -> `0_70`, `-v 0.7` -> `0_7`, sweep -> `0_5 0_55 ... 1_0 ... 1_15`. Always `ls full_dut/run_dut_<model>_<cell>/` before `cd` (a failed `cd` makes later greps silently hit other files).
+7. **Validate:** per VDD `grep -c failed invfo3_mod.sp.lis` = 0; `grep -E "^ *(stage_delay|ceff|acreff|iddq_stage)=" invfo3_mod.sp.lis` numeric; monotonic trend over a sweep. Compare with published values (below) and report the % delta.
+8. **Publish:** only the datasets/rows requested. Chain rows live in `chain_cells` of the model's dataset (e.g. `v0p43_SLVT_TT`, index.html ~l.948, ppg_results.html ~l.883) with fields `label, stage_delay, ceff, acreff, iddq`; `chain_meta.vdd` is one string (`'0.70 V'`). Edit both files, then `node verify_dataset_consistency.js` on both. NOTE (from reading index.html l.1340, not yet exercised): the site groups chain VDDs across datasets with the same model+vt, so a chain at another VDD or a chain sweep needs its own dataset id/`chain_meta.vdd`, not extra rows in the 0.70 V dataset. Ask the user before restructuring.
+9. GITHUB GATE (ask user: model, SPF TCAD header, key numbers, verify results, git status), explicit `git add`, token push, curl live site (Issue 18).
+10. Log new problems as numbered Issues in BOTH this file and SKILL.md.
+
+### Published chain data (website `chain_cells`, TT, 25 C, 101 stages)
+| Model / cell | VDD | stage_delay ps | ceff fF | acreff kOhm | iddq_stage nA | Source |
+|---|---|---|---|---|---|---|
+| RPDK0.43 `5T_NAND2_F03` | 0.70 V | 14.20280 | 2.03313 | 6.98569 | 3.19155 | re-extracted SPF `extraction/reext_F03/..._ported.spf`, 2026-10-14 (replaces 14.61083 / 1.96227 / 7.44588 / 3.19102 from the 2026-10-13 `layout/` SPF) |
+
+---
+
+
 
 ## 1. LM_LICENSE_FILE is empty in the login environment
 
@@ -898,3 +949,12 @@ Hardcoded in `sb_versions`: `lib_dir=.../1p4/IIMmintaka/usr/sbajaj/icl/${lib_nam
      - `stage_delay`: 26.46 ps @ 0.50 V → 14.61 ps @ 0.70 V → 9.45 ps @ 1.15 V (monotonic scaling).
      - `stage_freq`: 37.79 GHz @ 0.50 V → 68.44 GHz @ 0.70 V → 105.77 GHz @ 1.15 V.
      - Full results saved to `full_dut/results_dut_v0.43_NAND2_X1_5T_125H_RX15_F03_SLVT_B_M2.txt`.
+
+## Issue 33 — Re-extracted F03 SPF: port-bridge node names are not stable between StarRC runs (found 2026-10-14; fix validated by a 0.70 V chain sim, see update below)
+
+**Symptom:** `extraction/reext_F03/PEX/NAND2_X1_5T_125H_RX15_F03_SLVT_B_M2.spf` (StarRC re-run 12:31) has `.SUBCKT NAME` with NO ports and no `R_PORT_*` bridges. The old Issue 32 bridge nodes (`2:50388`, `3:5248`, `ENA_IN:56489`, `43:F27634`) do not exist in it (0 references; the net is now named `22`, not `ENA_IN`, and the output is net `4`, not `43`). Reusing the old bridge lines would leave the ports floating.
+**Evidence:** LVS (`reext_F03/LVS/*.LVS_ERRORS`): 1206/1206 devices and 606 nets matched, 4/4 ports matched, but "4 schematic port nets equated to layout non-port nets": VDD!=3, RO_OUT=4, RO_ENA=22, VSS!=2 and "4 untexted layout ports". The Final result FAIL is therefore only port texting, not a topology mismatch.
+**Fix applied (netlist only):** pick the most-referenced node of each LVS-mapped net (`hub()` = most frequent `<net>:<id>` token outside comments) and add `.SUBCKT ... ENA VSS VDD RO_OUT` plus 4 `R_PORT_* 1u` lines before `.ENDS`. Result: `extraction/reext_F03/NAND2_X1_5T_125H_RX15_F03_SLVT_B_M2_ported.spf` (VSS=2:61074 VDD=3:61690 RO_OUT=4:51923 ENA=22:53139). Dry run of `full_dut/run_ppg_dut.sh ... -d` generated and verified all 14 netlists.
+**Status:** VALIDATED by the 0.70 V chain sim below. The working chain flow is `full_dut/run_ppg_dut.sh` (Runbook B at the top); Issues 23/25 only concern `collect_chain_and_push.sh` and the old hardcoded chain script. Previous run kept as `full_dut/run_dut_v0.43_F03_prereext/` and `results_dut_v0.43_F03_prereext.txt`.
+**Rule:** after every StarRC re-run, re-derive the port nets from the LVS "equated" table; never copy bridge node names from an older SPF. Not a ppg_sim_lib.sh bug.
+**Issue 33 update (2026-10-14) - 0.70 V result with the ported re-extracted SPF:** LSF job finished, 0 `failed` measures, v0.43 model pair, ring port order `XRO1 RO_ENA PSS PDD RO_OUT` matches `.SUBCKT ... ENA VSS VDD RO_OUT`. Results file `full_dut/results_dut_v0.43_F03_reext_0p7.txt`. Versus the published `5T_NAND2_F03` (index.html:948, ppg_results.html:883): stage_delay 14.20280 vs 14.61083 ps (-2.79%), ceff 2.03313 vs 1.96227 fF (+3.61%), acreff 6.98569 vs 7.44588 kOhm (-6.18%), iddq_stage 3.19155 vs 3.19102 nA (+0.02%). Re-extracted SPF is 8.77 MB vs 10.76 MB for the published one (different StarRC settings/run), so differences are parasitic-driven. PUBLISHED locally 2026-10-14 (user approved) in index.html and ppg_results.html; both verify scripts pass. Lesson: this was a chain run at ONE voltage (0.70 V), like the other models' chain rows - not a 14-point single-stage sweep; chain requests may ask for any VDD or a sweep. Lesson: run dir tag follows the literal `-v` string (`0.70` -> `0_70`).
