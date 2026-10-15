@@ -58,3 +58,4 @@ clean_hsp_files
 
 # Full DUT chain directory — scripts and netlists, AFS only
 full_dut/
+NOTES.md
