@@ -1195,3 +1195,17 @@ results/                         ← all result .txt files (Issue 41)
 **Rule:** The GitHub repo is a GitHub Pages dashboard ONLY. Never `git add` simulation scripts, netlists, or run directories. Always stage files explicitly by name. Run `node verify_dataset_consistency.js` on both HTML files before every push.
 
 **Live site verified:** `curl` returned 6 `registerDataset` calls on both `index.html` and `ppg_results.html` after push — all model datasets intact.
+
+---
+
+## Issue 44 — PPGRO_chain_menu14_v0p6SB2_slvt.txt was all-dashes; regenerated from rundirs (commit d44b462)
+
+**Problem:** `results/PPGRO_chain_menu14_v0p6SB2_slvt.txt` contained all `-` for all 24 cells × 14 VDD points. The HTML `rr()` arrays (from a prior collection run) were the only record of the v0.6SB2 simulation data.
+
+**Fix:** Used `grep -r` across all 336 `.sp.lis` files in `rundirs/run_vdd_v0p6SB2_slvt/` to collect all 5 metrics into a single pass, then rebuilt the tab-separated result file with a Python script. Verified `7TSL_INV @0.70V = 6.33879` matches HTML exactly.
+
+**Known failures in the regenerated file (pre-existing, not caused by this fix):**
+- All OAI21, OAI22, AOI21, AOI22 cells in 6TSL/7TSL/8TSL tiers: `stage_delay=failed` at all 14 VDDs — SPF terminal order issue (Issue 5), predates this session
+- `7TSL_AOI21` at VDD=0.75V and 0.80V, `7TSL_AOI22` at VDD=0.75V: `-` (3 HSPICE crashes, `.crash` file present; no `.MEASURE` output produced)
+
+**Rule:** When regenerating a result file from rundirs, use `grep -r --include="invfo3_mod.sp.lis"` across the whole tree — do NOT open files one at a time in Python (times out over AFS for 336 files). Process with Python afterwards from the single grep output file in `/tmp/`.
